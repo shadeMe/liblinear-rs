@@ -1,0 +1,6 @@
+[package]
+name = "rustic-liblinear"
+version = "0.1.0"
+authors = ["Madeesh Kannan", "Peter Schoener"]
+
+[dependencies]
