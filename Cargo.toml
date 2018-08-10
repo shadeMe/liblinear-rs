@@ -3,4 +3,16 @@ name = "rustic-liblinear"
 version = "0.1.0"
 authors = ["Madeesh Kannan", "Peter Schoener"]
 
+build = "build.rs"
+links = "liblinear.a"
+
+description = "Rust bindings for the liblinear C library"
+repository = "https://github.com/shadeMe/rustic-liblinear"
+keywords = ["machine learning", "statistics", "svm", "support vector machines"]
+license = "MIT"
+
 [dependencies]
+
+[build-dependencies]
+bindgen = "0.26.3"
+gcc = "0.3"
