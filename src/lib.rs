@@ -1,5 +1,2 @@
-pub mod bindings_wrapper;
-
-fn main() {
-	println!("Hello, world!");
-}
+pub mod sys;
+mod bindings;
