@@ -8,10 +8,10 @@ fn main() {
 		.file("liblinear/linear.cpp")
 		.compile("liblinear.a");
 
-	let bindings = bindgen::Builder::default()
-		.header("liblinear/linear.h")
-		.generate()
-		.expect("Unable to generate bindings!");
+//	let bindings = bindgen::Builder::default()
+//		.header("liblinear/linear.h")
+//		.generate()
+//		.expect("Unable to generate bindings!");
 
-	bindings.write_to_file("src/bindings/mod.rs").expect("Couldn't write bindings!");
+//	bindings.write_to_file("src/bindings/mod.rs").expect("Couldn't write bindings!");
 }
