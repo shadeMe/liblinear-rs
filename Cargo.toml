@@ -14,5 +14,4 @@ license = "MIT"
 [dependencies]
 
 [build-dependencies]
-bindgen = "0.26.3"
 gcc = "0.3"

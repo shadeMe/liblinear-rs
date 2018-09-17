@@ -1,2 +1,2 @@
-pub mod sys;
-mod bindings;
+pub mod core;
+mod ffi;
