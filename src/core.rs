@@ -1,114 +1,164 @@
 use ffi;
+use std;
+use std::ffi::CStr;
+use std::os::raw::c_char;
+use std::ptr;
+use util::train;
 
-#[derive(Debug, PartialEq)]
-pub enum ErrorKind {
-	InvalidData(String),
+#[derive(Debug, Fail)]
+pub enum ClassifierError {
+    /// Parameter errors
+    #[fail(display = "parameter error: {}", e)]
+    InvalidParameters { e: String },
 }
 
-pub struct Problem {
-	pub bound: ffi::LLProblem
+
+struct Problem {
+    backing_store_labels: Vec<f64>,
+    backing_store_features: Vec<Vec<ffi::FeatureNode>>,
+    backing_store_feature_ptrs: Vec<*const ffi::FeatureNode>,
+    bound: ffi::Problem,
 }
 
 impl Problem {
-	pub fn new(labels: Vec<f64>, features: Vec<Vec<f64>>, bias: f64) -> Result<Problem, ErrorKind> {
-		if labels.len() != features.len() {
-			return Err(ErrorKind::InvalidData(
-				"Mismatch between number of training instances and output labels".to_string(),
-			));
-		} else if labels.len() == 0 || features.len() == 0 {
-			return Err(ErrorKind::InvalidData("No input data".to_string()));
-		}
+    fn new(input_data: train::TrainingInput, bias: f64) -> Result<Problem, ClassifierError> {
+        let num_training_instances = input_data.len_data() as i32;
+        let num_features = input_data.len_features() as i32;
+        let has_bias = bias >= 0f64;
+	    let last_feature_index = input_data.last_feature_index() as i32;
 
-		let num_training_instances = labels.len() as i32;
-		let num_features = features[0].len() as i32;
-		let has_bias = bias >= 0f64;
+        let (mut transformed_features, labels): (Vec<Vec<ffi::FeatureNode>>, Vec<f64>) =
+            input_data.yield_data().iter().fold(
+                (
+                    Vec::<Vec<ffi::FeatureNode>>::default(),
+                    Vec::<f64>::default(),
+                ),
+                |(mut feats, mut labels), instance| {
+                    feats.push(
+                        instance
+                            .features()
+                            .iter()
+                            .map(|(index, value)| ffi::FeatureNode { index: *index as i32, value: *value })
+                            .collect(),
+                    );
+                    labels.push(instance.label());
+                    (feats, labels)
+                },
+            );
 
-		let mut transformed_features: Vec<*const ffi::LLFeatureNode> = features
-			.iter()
-			.zip(1..=num_features)
-			.map(|(v, i)| {
-				v.iter()
-					.map(|v| ffi::LLFeatureNode {
-						index: i as i32,
-						value: *v,
-					})
-					.collect()
-			})
-			.map(|mut v: Vec<ffi::LLFeatureNode>| {
-				if has_bias {
-					let index = (v.len() + 1) as i32;
-					v.push(ffi::LLFeatureNode { index, value: bias });
-				}
+	    // add feature nodes for non-negative biases and an extra book-end
+        transformed_features = transformed_features
+            .into_iter()
+            .map(|mut v: Vec<ffi::FeatureNode>| {
+                if has_bias {
+                    v.push(ffi::FeatureNode { index: last_feature_index, value: bias });
+                }
 
-				v.push(ffi::LLFeatureNode {
-					index: -1,
-					value: 0f64,
-				});
-				v.as_ptr()
-			})
-			.collect();
+                v.push(ffi::FeatureNode {
+                    index: -1,
+                    value: 0f64,
+                });
 
-		/* ### TODO don't we have to save the transformed input and output labels in the struct?
-					otherwise the backing store vecs will be dropped at the end of this function?
-		*/
-		let out = Ok(Problem {
-			bound: ffi::LLProblem {
-				l: num_training_instances as i32,
-				n: num_features + if has_bias { 1 } else { 0 } as i32,
-				y: labels.as_ptr(),
-				x: transformed_features.as_ptr(),
-				bias,
-			},
-		});
+	            v
+            })
+	        .collect();
 
-		::std::mem::drop(labels);
+        let mut transformed_feature_ptrs: Vec<*const ffi::FeatureNode> =
+            transformed_features.iter().map(|e| e.as_ptr()).collect();
 
-		out
-	}
+        // the pointers passed to ffi::Problem will be valid even after their corresponding Vecs
+        // are moved to a different location as they point to the actual backing store on the heap
+        Ok(Problem {
+            bound: ffi::Problem {
+                l: num_training_instances as i32,
+                n: num_features + if has_bias { 1 } else { 0 } as i32,
+                y: labels.as_ptr(),
+                x: transformed_feature_ptrs.as_ptr(),
+                bias,
+            },
+            backing_store_labels: labels,
+            backing_store_features: transformed_features,
+            backing_store_feature_ptrs: transformed_feature_ptrs,
+        })
+    }
 }
 
-pub struct Model {
-	bound: *mut ffi::LLModel,
+struct Parameter {
+    backing_store_weights: Vec<f64>,
+    backing_store_weight_labels: Vec<i32>,
+    backing_store_starting_solutions: Vec<f64>,
+    bound: ffi::Parameter,
 }
 
-impl Model {}
+impl Parameter {
+    fn new(
+        solver: ffi::SolverType,
+        eps: f64,
+        C: f64,
+        p: f64,
+        weights: Vec<f64>,
+        weight_labels: Vec<i32>,
+        init_sol: Vec<f64>,
+    ) -> Result<Parameter, ClassifierError> {
+        if weights.len() == 0 || weight_labels.len() == 0 {
+            return Err(ClassifierError::InvalidParameters {
+	            e: "No weights/weight labels".to_string(),
+            });
+        } else if weights.len() != weight_labels.len() {
+            return Err(ClassifierError::InvalidParameters {
+                e: "Mismatch between number of labels and weights".to_string(),
+            });
+        }
 
-#[cfg(test)]
-mod tests {
-	use super::*;
+        let num_weights = weights.len() as i32;
 
-	fn take_ownership(x: Vec<f64>) -> *const f64 {
-		x.as_ptr()
-	}
+        let mut param = Parameter {
+            bound: ffi::Parameter {
+                solver_type: solver as i32,
+                eps,
+                C,
+                nr_weight: num_weights,
+                weight_label: weight_labels.as_ptr(),
+                weight: weights.as_ptr(),
+                p,
+                init_sol: init_sol.as_ptr(),
+            },
+            backing_store_weights: weights,
+            backing_store_weight_labels: weight_labels,
+            backing_store_starting_solutions: init_sol,
+        };
 
-	#[test]
-	fn test_simple_drop() {
-		let mut x = vec![
-			1.0,
-			1.0,
-			1.0
-		];
-		let ptr = take_ownership(x);
-		unsafe {
-			assert_eq!(1.0, *ptr.offset(2));
-		}
-	}
+        unsafe {
+            let param_error = ffi::check_parameter(ptr::null::<ffi::Problem>(), &param.bound);
+            if param_error != ptr::null::<c_char>() {
+                return Err(ClassifierError::InvalidParameters {
+	                e: CStr::from_ptr(param_error)
+		                .to_string_lossy()
+		                .to_owned()
+		                .to_string(),
+                });
+            }
+        }
 
-	#[test]
-	fn test_problem_drop() {
-		let mut x = vec![
-			vec![0.1, 0.2, 0.3, 0.4],
-			vec![0.5, 0.6, 0.7, 0.8],
-			vec![0.9, 1.0, 1.1, 1.2],
-		];
-		let mut y = vec![
-			1.0,
-			2.0,
-			2.0
-		];
-		let prob = Problem::new(y, x, 1.2).unwrap();
-		unsafe {
-			assert_eq!(2.0, *prob.bound.y.offset(2));
-		}
-	}
+        Ok(param)
+    }
 }
+
+pub enum Solver {
+
+}
+
+struct Classifier {
+    problem: Option<Problem>,
+    parameter: Option<Parameter>,
+    model: *mut ffi::Model,
+}
+
+pub trait Trainer {
+    fn
+}
+
+pub trait Builder {
+    fn train()
+}
+

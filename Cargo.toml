@@ -12,6 +12,7 @@ keywords = ["machine learning", "statistics", "svm", "support vector machines"]
 license = "MIT"
 
 [dependencies]
+failure = "0.1.2"
 
 [build-dependencies]
 gcc = "0.3"
