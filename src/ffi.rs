@@ -1,6 +1,7 @@
+use num::FromPrimitive;
 use std::os::raw::c_char;
 
-
+#[derive(Copy, Clone)]
 #[repr(C)]
 pub struct FeatureNode {
     pub index: i32,
@@ -16,6 +17,7 @@ pub struct Problem {
     pub bias: f64,
 }
 
+#[derive(FromPrimitive)]
 pub enum SolverType {
     L2R_LR = 0,
     L2R_L2LOSS_SVC_DUAL = 1,

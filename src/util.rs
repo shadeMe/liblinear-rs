@@ -1,9 +1,12 @@
-pub mod train {
-    use failure::Fail;
-    use std::fs::File;
-    use std::io::{BufRead, BufReader};
-    use std::str::FromStr;
+use std::cmp::Eq;
+use std::f64;
 
+use failure::Fail;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::str::FromStr;
+
+pub mod train {
     #[derive(Debug, Fail)]
     pub enum TrainingInputError {
         /// File read/write errors
@@ -22,7 +25,7 @@ pub mod train {
     pub struct TrainingInstance {
         features: Vec<(u32, f64)>,
         label: f64,
-	    last_feature_index: u32
+        last_feature_index: u32,
     }
 
     impl TrainingInstance {
@@ -32,9 +35,9 @@ pub mod train {
         pub fn label(&self) -> f64 {
             self.label
         }
-	    pub fn last_feature_index(&self) -> u32 {
-		    self.last_feature_index
-	    }
+        pub fn last_feature_index(&self) -> u32 {
+            self.last_feature_index
+        }
     }
 
     impl FromStr for TrainingInstance {
@@ -155,14 +158,14 @@ pub mod train {
             })?);
 
             for line in reader.lines() {
-	            let mut new_training_instance = TrainingInstance::from_str(
-		            line.map_err(|io_err| TrainingInputError::IoError {
-			            e: io_err.to_string(),
-		            })?
-			            .as_str(),
-	            )?;
+                let mut new_training_instance = TrainingInstance::from_str(
+                    line.map_err(|io_err| TrainingInputError::IoError {
+                        e: io_err.to_string(),
+                    })?
+                        .as_str(),
+                )?;
 
-	            out.last_feature_index = new_training_instance.last_feature_index();
+                out.last_feature_index = new_training_instance.last_feature_index();
                 out.instances.push(new_training_instance);
             }
 
@@ -184,26 +187,26 @@ pub mod train {
                 });
             }
 
-	        let last_feature_index = (features.len() + 1) as u32;
+            let last_feature_index = (features.len() + 1) as u32;
 
             Ok(TrainingInput {
-	            instances: features
-		            .iter()
-		            .map(|feats| {
-			            feats
-				            .iter()
-				            .zip(1..=feats.len())
-				            .map(|(v, i)| (i as u32, *v))
-				            .collect::<Vec<(u32, f64)>>()
-		            })
-		            .zip(labels.iter())
-		            .map(|(features, label)| TrainingInstance {
-			            last_feature_index,
-			            features,
-			            label: *label,
-		            })
-		            .collect(),
-				last_feature_index
+                instances: features
+                    .iter()
+                    .map(|feats| {
+                        feats
+                            .iter()
+                            .zip(1..=feats.len())
+                            .map(|(v, i)| (i as u32, *v))
+                            .collect::<Vec<(u32, f64)>>()
+                    })
+                    .zip(labels.iter())
+                    .map(|(features, label)| TrainingInstance {
+                        last_feature_index,
+                        features,
+                        label: *label,
+                    })
+                    .collect(),
+                last_feature_index,
             })
         }
     }
