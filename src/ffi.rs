@@ -4,6 +4,7 @@ use std::os::raw::c_char;
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct FeatureNode {
+    // One-based index
     pub index: i32,
     pub value: f64,
 }

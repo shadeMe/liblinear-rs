@@ -1,7 +1,6 @@
+use failure::Fail;
 use std::cmp::Eq;
 use std::f64;
-
-use failure::Fail;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::str::FromStr;
@@ -204,6 +203,52 @@ pub mod train {
                         last_feature_index,
                         features,
                         label: *label,
+                    })
+                    .collect(),
+                last_feature_index,
+            })
+        }
+    }
+}
+
+use super::train::*;
+
+pub mod predict {
+    #[derive(Debug, Fail)]
+    pub enum PredictionInputError {
+        /// No data, mismatch between output and input, invalid data
+        #[fail(display = "data error: {}", e)]
+        DataError { e: String },
+    }
+
+    #[derive(Default)]
+    pub struct PredictionInput {
+        features: Vec<(u32, f64)>,
+        last_feature_index: u32,
+    }
+
+    impl PredictionInput {
+        pub fn last_feature_index(&self) -> u32 {
+            self.last_feature_index
+        }
+        pub fn from_dense_features(features: Vec<f64>) -> Result<PredictionInput, PredictionInputError> {
+            if features.len() == 0 {
+                return Err(PredictionInputError::DataError {
+                    e: "No input data".to_string(),
+                });
+            }
+
+            let last_feature_index = (features.len() + 1) as u32;
+
+            Ok(PredictionInput {
+                features: features
+                    .iter()
+                    .map(|feats| {
+                        feats
+                            .iter()
+                            .zip(1..=feats.len())
+                            .map(|(v, i)| (i as u32, *v))
+                            .collect::<Vec<(u32, f64)>>()
                     })
                     .collect(),
                 last_feature_index,

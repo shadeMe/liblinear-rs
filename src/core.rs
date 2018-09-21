@@ -8,11 +8,12 @@ use std::collections::HashSet;
 use std::ffi::CStr;
 use std::os::raw::c_char;
 use std::ptr;
+use util::predict::*;
 use util::train::*;
 
 #[derive(Debug, Fail)]
-pub enum ClassifierError {
-    /// Parameter errors
+pub enum ParameterError {
+	/// Invalid/incomplete parameter values
     #[fail(display = "parameter error: {}", e)]
     InvalidParameters { e: String },
 }
@@ -31,7 +32,7 @@ struct Problem {
 }
 
 impl Problem {
-    fn new(input_data: TrainingInput, bias: f64) -> Result<Problem, ClassifierError> {
+	fn new(input_data: TrainingInput, bias: f64) -> Result<Problem, ParameterError> {
         let num_training_instances = input_data.len_data() as i32;
         let num_features = input_data.len_features() as i32;
         let has_bias = bias >= 0f64;
@@ -162,7 +163,7 @@ impl ProblemBuilder {
         self
     }
 
-    pub fn build(self) -> Result<impl LibLinearProblem, Error> {
+	fn build(self) -> Result<Problem, Error> {
         Ok(Problem::new(self.input_data?, self.bias)?)
     }
 }
@@ -184,24 +185,24 @@ struct Parameter {
 
 impl Parameter {
     fn new(
-        solver: SolverType,
-        eps: f64,
-        C: f64,
-        p: f64,
-        weights: Vec<f64>,
-        weight_labels: Vec<i32>,
-        init_sol: Vec<f64>,
-    ) -> Result<Parameter, ClassifierError> {
+	    solver: SolverType,
+	    eps: f64,
+	    C: f64,
+	    p: f64,
+	    weights: Vec<f64>,
+	    weight_labels: Vec<i32>,
+	    init_sol: Vec<f64>,
+    ) -> Result<Parameter, ParameterError> {
         if weights.len() == 0 || weight_labels.len() == 0 {
-            return Err(ClassifierError::InvalidParameters {
+	        return Err(ParameterError::InvalidParameters {
                 e: "No weights/weight labels".to_string(),
             });
         } else if weights.len() != weight_labels.len() {
-            return Err(ClassifierError::InvalidParameters {
+	        return Err(ParameterError::InvalidParameters {
                 e: "Mismatch between number of labels and weights".to_string(),
             });
         } else if !init_sol.is_empty() && weights.len() != init_sol.len() {
-            return Err(ClassifierError::InvalidParameters {
+	        return Err(ParameterError::InvalidParameters {
                 e: "Mismatch between number of initial solutions and weights".to_string(),
             });
         }
@@ -231,7 +232,7 @@ impl Parameter {
         unsafe {
             let param_error = ffi::check_parameter(ptr::null(), &param.bound);
             if !param_error.is_null() {
-                return Err(ClassifierError::InvalidParameters {
+	            return Err(ParameterError::InvalidParameters {
                     e: CStr::from_ptr(param_error)
                         .to_string_lossy()
                         .to_owned()
@@ -344,7 +345,7 @@ impl ParameterBuilder {
         self
     }
 
-    pub fn build(self) -> Result<impl LibLinearParameter, Error> {
+	fn build(self) -> Result<Parameter, Error> {
         Ok(Parameter::new(
             self.solver_type,
             self.epsilon,
@@ -356,6 +357,32 @@ impl ParameterBuilder {
         )?)
     }
 }
+
+pub enum ModelType {
+	CLASSIFICATION,
+	REGRESSION,
+}
+
+pub trait LibLinearModel {
+	fn model_type(&self) -> ModelType;
+
+	// TODO add extra node for the bias and bookend
+	fn predict(&self, features: PredictionInput) -> f64;
+	fn predict_values(&self, features: PredictionInput) -> (f64, Vec<f64>);
+	fn predict_probabilities(&self, features: PredictionInput) -> (f64, Vec<f64>);
+
+	fn feature_coefficient(&self, feature_index: i32, label_index: i32) -> f64;
+	fn label_bias(&self, label_index: i32) -> f64;
+}
+
+pub trait LibLinearCrossValidator {
+	fn cross_validation(&self, folds: i32) -> Vec<f64>;
+	fn find_optimal_constraints_violation_cost(&self, folds: i32, search_range: (f64, f64)) -> (f64, f64);
+}
+
+pub struct Serializer;
+
+impl Serializer {}
 
 pub struct Classifier {
     problem: Option<Problem>,
