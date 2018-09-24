@@ -1,8 +1,6 @@
-use failure::Fail;
-use std::cmp::Eq;
-use std::f64;
 use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::io::BufRead;
+use std::io::BufReader;
 use std::str::FromStr;
 
 pub mod train {
@@ -20,7 +18,7 @@ pub mod train {
     }
 
     /// A tuple of a (sparse)vector of features and their corresponding gold-standard label
-    #[derive(Default)]
+    #[derive(Default, Clone)]
     pub struct TrainingInstance {
         features: Vec<(u32, f64)>,
         label: f64,
@@ -211,8 +209,6 @@ pub mod train {
     }
 }
 
-use super::train::*;
-
 pub mod predict {
     #[derive(Debug, Fail)]
     pub enum PredictionInputError {
@@ -228,10 +224,15 @@ pub mod predict {
     }
 
     impl PredictionInput {
+        pub fn yield_data(self) -> Vec<(u32, f64)> {
+            self.features
+        }
         pub fn last_feature_index(&self) -> u32 {
             self.last_feature_index
         }
-        pub fn from_dense_features(features: Vec<f64>) -> Result<PredictionInput, PredictionInputError> {
+        pub fn from_dense_features(
+            features: Vec<f64>,
+        ) -> Result<PredictionInput, PredictionInputError> {
             if features.len() == 0 {
                 return Err(PredictionInputError::DataError {
                     e: "No input data".to_string(),
