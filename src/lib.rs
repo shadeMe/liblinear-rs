@@ -395,12 +395,12 @@ pub trait LibLinearModel: SerializableModel {
 }
 
 pub trait LibLinearCrossValidator {
-	fn cross_validation(&self, folds: i32) -> Vec<f64>;
+	fn cross_validation(&self, folds: i32) -> Result<Vec<f64>, ModelError>;
 	fn find_optimal_constraints_violation_cost(
 		&self,
 		folds: i32,
 		search_range: (f64, f64),
-	) -> (f64, f64);
+	) -> Result<(f64, f64), ModelError>;
 }
 
 struct Model {
@@ -528,56 +528,120 @@ impl LibLinearModel for Model {
 	}
 
 	fn predict(&self, features: PredictionInput) -> f64 {
-		let transformed_features = self.preprocess_prediction_input(features);
-		unimplemented!()
+		self.predict_values(features).0
 	}
 
 	fn predict_values(&self, features: PredictionInput) -> (f64, Vec<f64>) {
-		unimplemented!()
+		let transformed_features = self.preprocess_prediction_input(features);
+		unsafe {
+			let mut output_values: Vec<f64> = match (*self.bound).nr_class {
+				2 => vec![0f64; 1],
+				l => vec![0f64; l as usize],
+			};
+
+			let best_class = ffi::predict_values(
+				self.bound,
+				transformed_features.as_ptr(),
+				output_values.as_mut_ptr(),
+			);
+			(best_class, output_values)
+		}
 	}
 
 	fn predict_probabilities(&self, features: PredictionInput) -> (f64, Vec<f64>) {
-		unimplemented!()
+		let transformed_features = self.preprocess_prediction_input(features);
+		unsafe {
+			let mut output_probabilities = vec![0f64; (*self.bound).nr_class as usize];
+
+			let best_class = ffi::predict_values(
+				self.bound,
+				transformed_features.as_ptr(),
+				output_probabilities.as_mut_ptr(),
+			);
+			(best_class, output_probabilities)
+		}
 	}
 
 	fn feature_coefficient(&self, feature_index: i32, label_index: i32) -> f64 {
-		unimplemented!()
+		unsafe { ffi::get_decfun_coef(self.bound, feature_index, label_index) }
 	}
 
 	fn label_bias(&self, label_index: i32) -> f64 {
-		unimplemented!()
+		unsafe { ffi::get_decfun_bias(self.bound, label_index) }
 	}
 
 	fn bias(&self) -> f64 {
-		unimplemented!()
+		unsafe { (*self.bound).bias }
 	}
 
 	fn num_classes(&self) -> usize {
-		unimplemented!()
+		unsafe { (*self.bound).nr_class as usize }
 	}
 
 	fn num_features(&self) -> usize {
-		unimplemented!()
+		unsafe { (*self.bound).nr_feature as usize }
 	}
 }
 
 impl LibLinearCrossValidator for Model {
-	fn cross_validation(&self, folds: i32) -> Vec<f64> {
-		unimplemented!()
+	fn cross_validation(&self, folds: i32) -> Result<Vec<f64>, ModelError> {
+		if self.problem.is_none() || self.parameter.is_none() {
+			return Err(ModelError::InvalidState {
+				e: "Invalid problem/parameters for cross validator"
+					.to_owned()
+					.to_string(),
+			});
+		}
+
+		unsafe {
+			let mut output_labels = vec![0f64; self.problem.as_ref().unwrap().bound.l as usize];
+
+			ffi::cross_validation(
+				&self.problem.as_ref().unwrap().bound,
+				&self.parameter.as_ref().unwrap().bound,
+				folds,
+				output_labels.as_mut_ptr(),
+			);
+			Ok(output_labels)
+		}
 	}
 
 	fn find_optimal_constraints_violation_cost(
 		&self,
 		folds: i32,
 		search_range: (f64, f64),
-	) -> (f64, f64) {
-		unimplemented!()
+	) -> Result<(f64, f64), ModelError> {
+		if self.problem.is_none() || self.parameter.is_none() {
+			return Err(ModelError::InvalidState {
+				e: "Invalid problem/parameters for cross validator"
+					.to_owned()
+					.to_string(),
+			});
+		}
+
+		unsafe {
+			let mut best_cost = 0f64;
+			let mut best_rate = 0f64;
+			ffi::find_parameter_C(
+				&self.problem.as_ref().unwrap().bound,
+				&self.parameter.as_ref().unwrap().bound,
+				folds,
+				search_range.0,
+				search_range.1,
+				&mut best_cost,
+				&mut best_rate,
+			);
+			Ok((best_cost, best_rate))
+		}
 	}
 }
 
 impl Drop for Model {
 	fn drop(&mut self) {
-		unimplemented!()
+		unsafe {
+			let mut temp = self.bound;
+			ffi::free_and_destroy_model(&mut temp);
+		}
 	}
 }
 
@@ -632,4 +696,8 @@ impl Serializer {
 	) -> Result<(), Error> {
 		Ok(model.save_to_disk(path_to_serialized_model)?)
 	}
+}
+
+pub fn liblinear_version() -> i32 {
+	unsafe { ffi::liblinear_version }
 }
