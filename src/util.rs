@@ -1,9 +1,9 @@
-use std::fs::File;
-use std::io::BufRead;
-use std::io::BufReader;
-use std::str::FromStr;
-
 pub mod train {
+    use std::fs::File;
+    use std::io::BufRead;
+    use std::io::BufReader;
+    use std::str::FromStr;
+
     #[derive(Debug, Fail)]
     pub enum TrainingInputError {
         /// File read/write errors
@@ -244,14 +244,9 @@ pub mod predict {
             Ok(PredictionInput {
                 features: features
                     .iter()
-                    .map(|feats| {
-                        feats
-                            .iter()
-                            .zip(1..=feats.len())
-                            .map(|(v, i)| (i as u32, *v))
-                            .collect::<Vec<(u32, f64)>>()
-                    })
-                    .collect(),
+                    .zip(1..=features.len())
+                    .map(|(v, i)| (i as u32, *v))
+                    .collect::<Vec<(u32, f64)>>(),
                 last_feature_index,
             })
         }
