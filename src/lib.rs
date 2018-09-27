@@ -13,6 +13,7 @@ use util::*;
 
 mod ffi;
 pub mod util;
+pub mod metrics;
 
 #[derive(Debug, Fail)]
 pub enum ParameterError {
@@ -100,7 +101,7 @@ impl Problem {
             })
             .collect();
 
-        let mut transformed_feature_ptrs: Vec<*const ffi::FeatureNode> =
+	    let transformed_feature_ptrs: Vec<*const ffi::FeatureNode> =
             transformed_features.iter().map(|e| e.as_ptr()).collect();
 
         // the pointers passed to ffi::Problem will be valid even after their corresponding Vecs
@@ -124,13 +125,13 @@ impl LibLinearProblem for Problem {}
 
 impl Clone for Problem {
     fn clone(&self) -> Self {
-        let mut labels = self.backing_store_labels.clone();
-        let mut transformed_features: Vec<Vec<ffi::FeatureNode>> = self
+	    let labels = self.backing_store_labels.clone();
+	    let transformed_features: Vec<Vec<ffi::FeatureNode>> = self
             .backing_store_features
             .iter()
             .map(|e| (*e).clone())
             .collect();
-        let mut transformed_feature_ptrs: Vec<*const ffi::FeatureNode> =
+	    let transformed_feature_ptrs: Vec<*const ffi::FeatureNode> =
             transformed_features.iter().map(|e| e.as_ptr()).collect();
 
         Problem {
@@ -169,7 +170,7 @@ impl ProblemBuilder {
         self
     }
     fn build(self) -> Result<Problem, Error> {
-        let mut input_data = self.input_data.ok_or(ProblemError::InvalidTrainingData {
+	    let input_data = self.input_data.ok_or(ProblemError::InvalidTrainingData {
             e: "Missing input/training data".to_string(),
         })?;
 
@@ -218,7 +219,7 @@ impl Parameter {
 
         let num_weights = weights.len() as i32;
 
-        let mut param = Parameter {
+	    let param = Parameter {
             bound: ffi::Parameter {
                 solver_type: solver as i32,
                 eps,

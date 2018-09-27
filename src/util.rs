@@ -56,6 +56,10 @@ impl FromStr for TrainingInstance {
                 let mut features: Vec<(u32, f64)> = Vec::default();
 
                 for (idx, token) in splits.iter().enumerate() {
+	                if token.is_empty() {
+		                continue;
+	                }
+
                     match idx {
                         0 => {
                             label = token.parse::<f64>().map_err(|_| {
@@ -131,11 +135,7 @@ impl TrainingInput {
         self.instances.len()
     }
     pub fn len_features(&self) -> usize {
-        if self.instances.len() == 0 {
-            0
-        } else {
-            self.instances[0].features().len()
-        }
+	    self.last_feature_index as usize
     }
 
     pub fn from_libsvm_file(path: &str) -> Result<TrainingInput, TrainingInputError> {
