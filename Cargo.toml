@@ -1,5 +1,5 @@
 [package]
-name = "rustic_liblinear"
+name = "liblinear"
 version = "0.1.0"
 authors = ["Madeesh Kannan", "Peter Schoener"]
 
@@ -7,16 +7,15 @@ build = "build.rs"
 links = "liblinear.a"
 
 description = "Rust bindings for the liblinear C library"
-repository = "https://github.com/shadeMe/rustic-liblinear"
+repository = "https://github.com/shadeMe/liblinear-rs"
 keywords = ["machine learning", "statistics", "svm", "support vector machines"]
 license = "MIT"
 
 [dependencies]
 failure = "0.1.2"
-itertools = "0.7.8"
 num = "0.2.0"
 num-derive = "0.2.2"
 num-traits = "0.2.6"
 
 [build-dependencies]
-gcc = "0.3"
+cc = "1.0"
