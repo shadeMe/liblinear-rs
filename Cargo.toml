@@ -1,5 +1,5 @@
 [package]
-name = "rustic-liblinear"
+name = "rustic_liblinear"
 version = "0.1.0"
 authors = ["Madeesh Kannan", "Peter Schoener"]
 

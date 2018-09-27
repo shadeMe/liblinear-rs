@@ -19,6 +19,7 @@ pub struct Problem {
 }
 
 #[derive(FromPrimitive)]
+#[allow(non_camel_case_types)]
 pub enum SolverType {
     L2R_LR = 0,
     L2R_L2LOSS_SVC_DUAL = 1,
