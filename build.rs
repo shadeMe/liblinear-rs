@@ -5,7 +5,6 @@ fn main() {
         .cpp(true)
         .cpp_link_stdlib("stdc++")
         .flag("-O3")
-        .flag("-fPIC")
         .file("liblinear/linear.cpp")
         .file("liblinear/tron.cpp")
         .file("liblinear/blas/daxpy.c")

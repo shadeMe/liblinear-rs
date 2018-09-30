@@ -56,9 +56,9 @@ impl FromStr for TrainingInstance {
                 let mut features: Vec<(u32, f64)> = Vec::default();
 
                 for (idx, token) in splits.iter().enumerate() {
-	                if token.is_empty() {
-		                continue;
-	                }
+                    if token.is_empty() {
+                        continue;
+                    }
 
                     match idx {
                         0 => {
@@ -118,7 +118,7 @@ impl FromStr for TrainingInstance {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct TrainingInput {
     instances: Vec<TrainingInstance>,
     last_feature_index: u32,
@@ -135,7 +135,10 @@ impl TrainingInput {
         self.instances.len()
     }
     pub fn len_features(&self) -> usize {
-	    self.last_feature_index as usize
+        self.last_feature_index as usize
+    }
+    pub fn get(&self, index: usize) -> Option<&TrainingInstance> {
+        self.instances.get(index)
     }
 
     pub fn from_libsvm_file(path: &str) -> Result<TrainingInput, TrainingInputError> {
@@ -175,7 +178,7 @@ impl TrainingInput {
             });
         }
 
-        let last_feature_index = (features.len() + 1) as u32;
+        let last_feature_index = features.len() as u32;
 
         Ok(TrainingInput {
             instances: features
@@ -197,6 +200,40 @@ impl TrainingInput {
             last_feature_index,
         })
     }
+
+    pub fn from_sparse_features(
+        labels: Vec<f64>,
+        features: Vec<Vec<(u32, f64)>>,
+    ) -> Result<TrainingInput, TrainingInputError> {
+        if labels.len() != features.len() {
+            return Err(TrainingInputError::DataError {
+                e: "Mismatch between number of training instances and output labels".to_string(),
+            });
+        } else if labels.len() == 0 || features.len() == 0 {
+            return Err(TrainingInputError::DataError {
+                e: "No input/output data".to_string(),
+            });
+        }
+
+        let last_feature_index = features.iter().fold(0u32, |acc, feats| {
+            feats
+                .iter()
+                .fold(acc, |acc, (i, v)| if *i > acc { *i } else { acc })
+        });
+
+        Ok(TrainingInput {
+            instances: features
+                .into_iter()
+                .zip(labels.iter())
+                .map(|(features, label)| TrainingInstance {
+                    last_feature_index,
+                    features,
+                    label: *label,
+                })
+                .collect(),
+            last_feature_index,
+        })
+    }
 }
 
 #[derive(Debug, Fail)]
@@ -206,13 +243,16 @@ pub enum PredictionInputError {
     DataError { e: String },
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct PredictionInput {
     features: Vec<(u32, f64)>,
     last_feature_index: u32,
 }
 
 impl PredictionInput {
+    pub fn features(&self) -> &Vec<(u32, f64)> {
+        &self.features
+    }
     pub fn yield_data(self) -> Vec<(u32, f64)> {
         self.features
     }
@@ -228,7 +268,7 @@ impl PredictionInput {
             });
         }
 
-        let last_feature_index = (features.len() + 1) as u32;
+        let last_feature_index = features.len() as u32;
 
         Ok(PredictionInput {
             features: features
@@ -236,6 +276,24 @@ impl PredictionInput {
                 .zip(1..=features.len())
                 .map(|(v, i)| (i as u32, *v))
                 .collect::<Vec<(u32, f64)>>(),
+            last_feature_index,
+        })
+    }
+    pub fn from_sparse_features(
+        features: Vec<(u32, f64)>,
+    ) -> Result<PredictionInput, PredictionInputError> {
+        if features.len() == 0 {
+            return Err(PredictionInputError::DataError {
+                e: "No input data".to_string(),
+            });
+        }
+
+        let last_feature_index = features
+            .iter()
+            .fold(0u32, |acc, (i, v)| if *i > acc { *i } else { acc });
+
+        Ok(PredictionInput {
+            features,
             last_feature_index,
         })
     }

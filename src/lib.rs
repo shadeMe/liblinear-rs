@@ -12,8 +12,8 @@ use std::ptr;
 use util::*;
 
 mod ffi;
-pub mod util;
 pub mod metrics;
+pub mod util;
 
 #[derive(Debug, Fail)]
 pub enum ParameterError {
@@ -87,7 +87,7 @@ impl Problem {
             .map(|mut v: Vec<ffi::FeatureNode>| {
                 if has_bias {
                     v.push(ffi::FeatureNode {
-                        index: last_feature_index,
+	                    index: last_feature_index + 1,
                         value: bias,
                     });
                 }
@@ -158,10 +158,10 @@ impl ProblemBuilder {
     fn new() -> ProblemBuilder {
         ProblemBuilder {
             input_data: None,
-            bias: 0.0,
+	        bias: -1.0,
         }
     }
-    fn input_data(&mut self, input_data: TrainingInput) -> &mut Self {
+	pub fn input_data(&mut self, input_data: TrainingInput) -> &mut Self {
         self.input_data = Some(input_data);
         self
     }
@@ -203,15 +203,7 @@ impl Parameter {
         weight_labels: Vec<i32>,
         init_sol: Vec<f64>,
     ) -> Result<Parameter, ParameterError> {
-        if weights.len() == 0 || weight_labels.len() == 0 {
-            return Err(ParameterError::InvalidParameters {
-                e: "No weights/weight labels".to_string(),
-            });
-        } else if weights.len() != weight_labels.len() {
-            return Err(ParameterError::InvalidParameters {
-                e: "Mismatch between number of labels and weights".to_string(),
-            });
-        } else if !init_sol.is_empty() && weights.len() != init_sol.len() {
+	    if !init_sol.is_empty() && !weights.is_empty() && weights.len() != init_sol.len() {
             return Err(ParameterError::InvalidParameters {
                 e: "Mismatch between number of initial solutions and weights".to_string(),
             });
@@ -225,8 +217,16 @@ impl Parameter {
                 eps,
                 C: cost,
                 nr_weight: num_weights,
-                weight_label: weight_labels.as_ptr(),
-                weight: weights.as_ptr(),
+	            weight_label: if weight_labels.is_empty() {
+		            ptr::null()
+	            } else {
+		            weight_labels.as_ptr()
+	            },
+	            weight: if weights.is_empty() {
+		            ptr::null()
+	            } else {
+		            weights.as_ptr()
+	            },
                 p,
                 init_sol: if init_sol.is_empty() {
                     ptr::null()
@@ -308,9 +308,9 @@ impl ParameterBuilder {
     fn new() -> ParameterBuilder {
         ParameterBuilder {
             solver_type: SolverType::L2R_LR,
-            epsilon: 0.0,
-            cost: 0.0,
-            p: 0.0,
+	        epsilon: 0.01,
+	        cost: 1.0,
+	        p: 0.1,
             weights: Vec::new(),
             weight_labels: Vec::new(),
             init_solutions: Vec::new(),
@@ -370,31 +370,39 @@ pub enum ModelType {
     REGRESSION,
 }
 
-#[doc(hidden)]
-pub trait SerializableModel {
-    fn save_to_disk(&self, file_path: &str) -> Result<(), ModelError>;
+pub trait HasLibLinearProblem {
+	type Output: LibLinearProblem;
+	fn problem(&self) -> Option<&Self::Output>;
 }
 
-pub trait LibLinearModel: SerializableModel {
-    type Parameter: LibLinearParameter;
-    type Problem: LibLinearProblem;
+pub trait HasLibLinearParameter {
+	type Output: LibLinearParameter;
+	fn parameter(&self) -> Option<&Self::Output>;
+}
 
+pub trait LibLinearModel: HasLibLinearProblem + HasLibLinearParameter {
     fn model_type(&self) -> Result<ModelType, ModelError>;
-    fn parameters(&self) -> Option<&Self::Parameter>;
-    fn problem(&self) -> Option<&Self::Problem>;
 
-    fn predict(&self, features: PredictionInput) -> f64;
-    fn predict_values(&self, features: PredictionInput) -> (f64, Vec<f64>);
-    fn predict_probabilities(&self, features: PredictionInput) -> (f64, Vec<f64>);
+	fn predict(&self, features: PredictionInput) -> Result<f64, PredictionInputError>;
+	fn predict_values(
+		&self,
+		features: PredictionInput,
+	) -> Result<(f64, Vec<f64>), PredictionInputError>;
+	fn predict_probabilities(
+		&self,
+		features: PredictionInput,
+	) -> Result<(f64, Vec<f64>), PredictionInputError>;
 
     fn feature_coefficient(&self, feature_index: i32, label_index: i32) -> f64;
     fn label_bias(&self, label_index: i32) -> f64;
     fn bias(&self) -> f64;
     fn num_classes(&self) -> usize;
     fn num_features(&self) -> usize;
+
+	fn save_to_disk(&self, file_path: &str) -> Result<(), ModelError>;
 }
 
-pub trait LibLinearCrossValidator {
+pub trait LibLinearCrossValidator: HasLibLinearProblem + HasLibLinearParameter {
     fn cross_validation(&self, folds: i32) -> Result<Vec<f64>, ModelError>;
     fn find_optimal_constraints_violation_cost(
         &self,
@@ -451,12 +459,22 @@ impl Model {
     }
 
     fn preprocess_prediction_input(
-        &self,
-        prediction_input: PredictionInput,
-    ) -> Vec<ffi::FeatureNode> {
+	    &self,
+	    prediction_input: PredictionInput,
+    ) -> Result<Vec<ffi::FeatureNode>, PredictionInputError> {
         assert_ne!(self.bound.is_null(), true);
 
         let last_feature_index = prediction_input.last_feature_index() as i32;
+	    if last_feature_index as usize != self.num_features() {
+		    return Err(PredictionInputError::DataError {
+			    e: format!(
+				    "Expected {} features, found {} instead",
+				    self.num_features(),
+				    last_feature_index
+			    ).to_string(),
+		    });
+	    }
+
         let bias = unsafe { (*self.bound).bias };
         let has_bias = bias >= 0f64;
         let mut data: Vec<ffi::FeatureNode> = prediction_input
@@ -470,7 +488,7 @@ impl Model {
 
         if has_bias {
             data.push(ffi::FeatureNode {
-                index: last_feature_index,
+	            index: last_feature_index + 1,
                 value: bias,
             });
         }
@@ -480,29 +498,27 @@ impl Model {
             value: 0f64,
         });
 
-        data
+	    Ok(data)
     }
 }
 
-impl SerializableModel for Model {
-    fn save_to_disk(&self, file_path: &str) -> Result<(), ModelError> {
-        unsafe {
-            let result = ffi::save_model(CString::new(file_path).unwrap().as_ptr(), self.bound);
-            if result == -1 {
-                return Err(ModelError::SerializationError {
-                    e: "save_model() returned -1".to_owned().to_string(),
-                });
-            }
-        }
+impl HasLibLinearProblem for Model {
+	type Output = Problem;
 
-        Ok(())
+	fn problem(&self) -> Option<&Self::Output> {
+		self.problem.as_ref()
+	}
+}
+
+impl HasLibLinearParameter for Model {
+	type Output = Parameter;
+
+	fn parameter(&self) -> Option<&Self::Output> {
+		self.parameter.as_ref()
     }
 }
 
 impl LibLinearModel for Model {
-    type Parameter = Parameter;
-    type Problem = Problem;
-
     fn model_type(&self) -> Result<ModelType, ModelError> {
         unsafe {
             if !self.bound.is_null() {
@@ -519,20 +535,15 @@ impl LibLinearModel for Model {
         })
     }
 
-    fn parameters(&self) -> Option<&Self::Parameter> {
-        self.parameter.as_ref()
+	fn predict(&self, features: PredictionInput) -> Result<f64, PredictionInputError> {
+		Ok(self.predict_values(features)?.0)
     }
 
-    fn problem(&self) -> Option<&Self::Problem> {
-        self.problem.as_ref()
-    }
-
-    fn predict(&self, features: PredictionInput) -> f64 {
-        self.predict_values(features).0
-    }
-
-    fn predict_values(&self, features: PredictionInput) -> (f64, Vec<f64>) {
-        let transformed_features = self.preprocess_prediction_input(features);
+	fn predict_values(
+		&self,
+		features: PredictionInput,
+	) -> Result<(f64, Vec<f64>), PredictionInputError> {
+		let transformed_features = self.preprocess_prediction_input(features)?;
         unsafe {
             let mut output_values: Vec<f64> = match (*self.bound).nr_class {
                 2 => vec![0f64; 1],
@@ -544,12 +555,15 @@ impl LibLinearModel for Model {
                 transformed_features.as_ptr(),
                 output_values.as_mut_ptr(),
             );
-            (best_class, output_values)
+	        Ok((best_class, output_values))
         }
     }
 
-    fn predict_probabilities(&self, features: PredictionInput) -> (f64, Vec<f64>) {
-        let transformed_features = self.preprocess_prediction_input(features);
+	fn predict_probabilities(
+		&self,
+		features: PredictionInput,
+	) -> Result<(f64, Vec<f64>), PredictionInputError> {
+		let transformed_features = self.preprocess_prediction_input(features)?;
         unsafe {
             let mut output_probabilities = vec![0f64; (*self.bound).nr_class as usize];
 
@@ -558,7 +572,7 @@ impl LibLinearModel for Model {
                 transformed_features.as_ptr(),
                 output_probabilities.as_mut_ptr(),
             );
-            (best_class, output_probabilities)
+	        Ok((best_class, output_probabilities))
         }
     }
 
@@ -581,6 +595,20 @@ impl LibLinearModel for Model {
     fn num_features(&self) -> usize {
         unsafe { (*self.bound).nr_feature as usize }
     }
+
+	fn save_to_disk(&self, file_path: &str) -> Result<(), ModelError> {
+		unsafe {
+			let file_path_cstr = CString::new(file_path).unwrap();
+			let result = ffi::save_model(file_path_cstr.as_ptr(), self.bound);
+			if result == -1 {
+				return Err(ModelError::SerializationError {
+					e: "save_model() returned -1".to_owned().to_string(),
+				});
+			}
+		}
+
+		Ok(())
+	}
 }
 
 impl LibLinearCrossValidator for Model {
@@ -691,8 +719,8 @@ impl Serializer {
     }
 
     pub fn save_model(
-        path_to_serialized_model: &str,
-        model: &LibLinearModel<Parameter=Parameter, Problem=Problem>,
+	    path_to_serialized_model: &str,
+	    model: &impl LibLinearModel,
     ) -> Result<(), Error> {
         Ok(model.save_to_disk(path_to_serialized_model)?)
     }
