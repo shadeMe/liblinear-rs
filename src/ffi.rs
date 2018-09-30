@@ -1,14 +1,18 @@
 use num::FromPrimitive;
 use std::os::raw::c_char;
 
+
 #[derive(Copy, Clone)]
 #[repr(C)]
+/// Represents a single feature in a sparse feature vector.
 pub struct FeatureNode {
-    // One-based index
+	/// One-based index of the feature in the feature vector.
     pub index: i32,
+	/// Value corresponding to the feature.
     pub value: f64,
 }
 
+#[doc(hidden)]
 #[repr(C)]
 pub struct Problem {
     pub l: i32,
@@ -18,22 +22,7 @@ pub struct Problem {
     pub bias: f64,
 }
 
-#[derive(FromPrimitive)]
-#[allow(non_camel_case_types)]
-pub enum SolverType {
-    L2R_LR = 0,
-    L2R_L2LOSS_SVC_DUAL = 1,
-    L2R_L2LOSS_SVC = 2,
-    L2R_L1LOSS_SVC_DUAL = 3,
-    MCSVM_CS = 4,
-    L1R_L2LOSS_SVC = 5,
-    L1R_LR = 6,
-    L2R_LR_DUAL = 7,
-    L2R_L2LOSS_SVR = 11,
-    L2R_L2LOSS_SVR_DUAL = 12,
-    L2R_L1LOSS_SVR_DUAL = 13,
-}
-
+#[doc(hidden)]
 #[allow(non_snake_case)]
 #[repr(C)]
 pub struct Parameter {
@@ -48,6 +37,7 @@ pub struct Parameter {
     pub init_sol: *const f64,
 }
 
+#[doc(hidden)]
 #[repr(C)]
 pub struct Model {
     pub param: Parameter,
@@ -58,6 +48,7 @@ pub struct Model {
     pub bias: f64,
 }
 
+#[doc(hidden)]
 extern "C" {
     pub static liblinear_version: i32;
 

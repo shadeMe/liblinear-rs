@@ -1,7 +1,11 @@
+#[macro_use]
+extern crate approx;
 extern crate liblinear;
+extern crate parsnip;
 
 use liblinear::*;
 use liblinear::util::*;
+use parsnip::*;
 
 fn create_default_model_builder() -> Builder {
 	let libsvm_data = util::TrainingInput::from_libsvm_file("tests/data/heart_scale").unwrap();
@@ -69,9 +73,9 @@ fn test_model_sparse_data() {
 	model_builder
 		.parameters()
 		.solver_type(SolverType::L2R_LR)
-		.epsilon(0.1f64)
-		.cost(0.1f64)
-		.loss_sensitivity(1f64);
+		.stopping_criterion(0.1f64)
+		.constraints_violation_cost(0.1f64)
+		.regression_loss_sensitivity(1f64);
 
 	let model = model_builder.build_model();
 	assert_eq!(model.is_ok(), true);
@@ -137,7 +141,7 @@ fn test_cross_validator() {
 	let mut model_builder = create_default_model_builder();
 	let cross_validator = model_builder.build_cross_validator().unwrap();
 
-	let ground_truth: Vec<f64> = vec![
+	let ground_truth = vec![
 		1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0,
 		1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0, 1.0, -1.0,
 		-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, 1.0, 1.0, 1.0,
@@ -155,10 +159,10 @@ fn test_cross_validator() {
 		-1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, 1.0,
 		-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0,
 		1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, 1.0,
-	];
-	let predicted = cross_validator.cross_validation(4);
-	assert_eq!(predicted.is_ok(), true);
-	//   assert_eq!(&predicted, &ground_truth);
+	].iter().map(|e| *e as i32).collect::<Vec<i32>>();
+	let predicted = cross_validator.cross_validation(4).unwrap().iter().map(|e| *e as i32).collect::<Vec<i32>>();
 
-	print!("{:?}", cross_validator.find_optimal_constraints_violation_cost(10, (0.0, 1.0)).unwrap());
+	println!("Accuracy: {}", categorical_accuracy(&predicted, &ground_truth).unwrap());
+	println!("Precision: {}", precision(&predicted, &ground_truth, Average::Macro).unwrap());
+	println!("Recall: {}", recall(&predicted, &ground_truth, Average::Macro).unwrap());
 }

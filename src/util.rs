@@ -7,13 +7,13 @@ use std::str::FromStr;
 pub enum TrainingInputError {
     /// File read/write errors
     #[fail(display = "io error: {}", e)]
-    IoError { e: String },
+    IoError { #[doc(hidden)] e: String },
     /// Parsing errors
     #[fail(display = "parse error: {}", e)]
-    ParseError { e: String },
+    ParseError { #[doc(hidden)] e: String },
     /// No data, mismatch between output and input, invalid data
     #[fail(display = "data error: {}", e)]
-    DataError { e: String },
+    DataError { #[doc(hidden)] e: String },
 }
 
 /// A tuple of a (sparse)vector of features and their corresponding gold-standard label
@@ -240,7 +240,7 @@ impl TrainingInput {
 pub enum PredictionInputError {
     /// No data, mismatch between output and input, invalid data
     #[fail(display = "data error: {}", e)]
-    DataError { e: String },
+    DataError { #[doc(hidden)] e: String },
 }
 
 #[derive(Default, Clone)]
