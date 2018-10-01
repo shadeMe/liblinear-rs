@@ -1,22 +1,29 @@
+//! Utility structs and functions for reading/generating training
+//! and prediction data.
+
 use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::str::FromStr;
 
+/// Errors related to input/training data.
 #[derive(Debug, Fail)]
 pub enum TrainingInputError {
-    /// File read/write errors
+	/// The LIBSVM data file was not found/couldn't be read.
     #[fail(display = "io error: {}", e)]
     IoError { #[doc(hidden)] e: String },
-    /// Parsing errors
+	/// The LIBSVM data file has invalid/incomplete entries that do not conform to the expected format.
     #[fail(display = "parse error: {}", e)]
     ParseError { #[doc(hidden)] e: String },
-    /// No data, mismatch between output and input, invalid data
+	/// The training data is invalid/incomplete.
+	///
+	/// This can occur if the input features are missing, or if there is mismatch between the
+	/// target values and the source features, or if the data is incorrect.
     #[fail(display = "data error: {}", e)]
     DataError { #[doc(hidden)] e: String },
 }
 
-/// A tuple of a (sparse)vector of features and their corresponding gold-standard label
+/// A tuple of a (sparse) vector of features and their corresponding gold-standard label/target value.
 #[derive(Default, Clone)]
 pub struct TrainingInstance {
     features: Vec<(u32, f64)>,
@@ -25,9 +32,13 @@ pub struct TrainingInstance {
 }
 
 impl TrainingInstance {
+	/// A list of tuples that encode a feature index and its corresponding feature value.
     pub fn features(&self) -> &Vec<(u32, f64)> {
         &self.features
     }
+	/// The target value.
+	///
+	/// Target values are either integers (in classification) or real numbers (in regression).
     pub fn label(&self) -> f64 {
         self.label
     }
@@ -36,6 +47,7 @@ impl TrainingInstance {
 impl FromStr for TrainingInstance {
     type Err = TrainingInputError;
 
+	/// Converts a string representing a single training instance in the LIBSVM data format.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         // assumes that the string is a valid line in the libSVM data format
         let mut last_feature_index = 0u32;
@@ -118,29 +130,41 @@ impl FromStr for TrainingInstance {
     }
 }
 
-#[derive(Default, Clone)]
+/// Input data for [LibLinearModel](trait.LibLinearModel.html) and [LibLinearCrossValidator](trait.LibLinearCrossValidator.html).
+#[derive(Clone)]
 pub struct TrainingInput {
     instances: Vec<TrainingInstance>,
     last_feature_index: u32,
 }
 
 impl TrainingInput {
+	#[doc(hidden)]
     pub fn last_feature_index(&self) -> u32 {
         self.last_feature_index
     }
+	#[doc(hidden)]
     pub fn yield_data(self) -> Vec<TrainingInstance> {
         self.instances
     }
+	/// Number of training instances.
     pub fn len_data(&self) -> usize {
         self.instances.len()
     }
+	/// Dimensionality of the feature vector.
     pub fn len_features(&self) -> usize {
         self.last_feature_index as usize
     }
+	/// Returns a reference to the training instance at the given index.
     pub fn get(&self, index: usize) -> Option<&TrainingInstance> {
         self.instances.get(index)
     }
-
+	/// Create a new instance from a LIBSVM training data file.
+	///
+	/// Each line in the data file represents a training instance and has the following format:
+	///
+	/// `<target_value> <feature_index>:<feature_value> <feature_index>:<feature_value>...`
+	///
+	/// Feature indices start from 1 and increase monotonically. However, they do not need to be continuous.
     pub fn from_libsvm_file(path: &str) -> Result<TrainingInput, TrainingInputError> {
         let mut out = TrainingInput::default();
         let reader = BufReader::new(File::open(path).map_err(|io_err| {
@@ -164,6 +188,7 @@ impl TrainingInput {
         Ok(out)
     }
 
+	/// Create a new instance from a dense vector of features and their corresponding target values.
     pub fn from_dense_features(
         labels: Vec<f64>,
         features: Vec<Vec<f64>>,
@@ -201,6 +226,9 @@ impl TrainingInput {
         })
     }
 
+	/// Create a new instance from a sparse vector of features and their corresponding target values.
+	///
+	/// The feature vector must be a list of tuples that encode a feature index and its corresponding feature value.
     pub fn from_sparse_features(
         labels: Vec<f64>,
         features: Vec<Vec<(u32, f64)>>,
@@ -236,29 +264,37 @@ impl TrainingInput {
     }
 }
 
+/// Errors related to test/prediction data.
 #[derive(Debug, Fail)]
 pub enum PredictionInputError {
-    /// No data, mismatch between output and input, invalid data
+	/// The prediction data is invalid/incomplete/missing.
     #[fail(display = "data error: {}", e)]
     DataError { #[doc(hidden)] e: String },
 }
 
-#[derive(Default, Clone)]
+
+/// Test data for [LibLinearModel](trait.LibLinearModel.html).
+#[derive(Clone)]
 pub struct PredictionInput {
     features: Vec<(u32, f64)>,
     last_feature_index: u32,
 }
 
 impl PredictionInput {
+	/// A list of tuples that encode a feature index and its corresponding feature value.
     pub fn features(&self) -> &Vec<(u32, f64)> {
         &self.features
     }
+	#[doc(hidden)]
     pub fn yield_data(self) -> Vec<(u32, f64)> {
         self.features
     }
+	#[doc(hidden)]
     pub fn last_feature_index(&self) -> u32 {
         self.last_feature_index
     }
+
+	/// Create a new instance from a dense vector of features.
     pub fn from_dense_features(
         features: Vec<f64>,
     ) -> Result<PredictionInput, PredictionInputError> {
@@ -279,6 +315,10 @@ impl PredictionInput {
             last_feature_index,
         })
     }
+
+	/// Create a new instance from a sparse vector of features.
+	///
+	/// The feature vector must be a list of tuples that encode a feature index and its corresponding feature value.
     pub fn from_sparse_features(
         features: Vec<(u32, f64)>,
     ) -> Result<PredictionInput, PredictionInputError> {

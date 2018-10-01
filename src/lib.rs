@@ -1,3 +1,8 @@
+//! # liblinear
+//!
+//! `liblinear` is a Rust wrapper for the [LIBLINEAR](https://www.csie.ntu.edu.tw/~cjlin/liblinear/)
+//! C++ machine learning library.
+
 #[macro_use]
 extern crate failure;
 extern crate num;
@@ -298,14 +303,14 @@ impl Default for SolverType {
 pub trait LibLinearParameter: Clone {
 	/// Solver used for classification or regression.
     fn solver_type(&self) -> SolverType;
-	/// Tolerance of termination criterion for optimization (parameter 'e').
+	/// Tolerance of termination criterion for optimization (parameter _e_).
     fn stopping_criterion(&self) -> f64;
-	/// Cost of constraints violation (parameter 'C').
+	/// Cost of constraints violation (parameter _C_).
 	///
 	/// Rules the trade-off between regularization and correct classification on data.
 	/// It can be seen as the inverse of a regularization constant.
     fn constraints_violation_cost(&self) -> f64;
-	/// Sensitivity of loss of support vector regression (parameter 'p').
+	/// Sensitivity of loss of support vector regression (parameter _p_).
     fn regression_loss_sensitivity(&self) -> f64;
 }
 
@@ -599,13 +604,13 @@ pub trait LibLinearCrossValidator: HasLibLinearProblem + HasLibLinearParameter {
 	/// Number of folds must be >= 2.
     fn cross_validation(&self, folds: i32) -> Result<Vec<f64>, ModelError>;
 
-	/// Performs k-folds cross-validation to find the best cost value (parameter 'C') within the
+	/// Performs k-folds cross-validation to find the best cost value (parameter _C_) within the
 	/// closed search range `(start_C, end_C)` and returns a tuple of the following values:
 	///
 	/// * The best cost value.
 	/// * The accuracy of the best cost value.
 	///
-	/// Cross validation is conducted many times under the following values of 'C':
+	/// Cross validation is conducted many times under the following values of _C_:
 	/// * `start_C`
 	/// * 2 * `start_C`
 	/// * 4 * `start_C`
@@ -917,7 +922,7 @@ impl Drop for Model {
 }
 
 
-/// Primary model builder.
+/// Primary model builder. Functions as the entry point into the API.
 pub struct Builder {
     problem_builder: ProblemBuilder,
     parameter_builder: ParameterBuilder,
@@ -932,11 +937,11 @@ impl Builder {
         }
     }
 
-	/// Returns the [ProblemBuilder](struct.ProblemBuilder.html).
+	/// Builder for the model's linear problem.
     pub fn problem(&mut self) -> &mut ProblemBuilder {
         &mut self.problem_builder
     }
-	/// Returns the [ParameterBuilder](struct.ParameterBuilder.html).
+	/// Builder for the model's tunable parameters.
     pub fn parameters(&mut self) -> &mut ParameterBuilder {
         &mut self.parameter_builder
     }
