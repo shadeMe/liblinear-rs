@@ -131,7 +131,7 @@ impl FromStr for TrainingInstance {
 }
 
 /// Input data for [LibLinearModel](trait.LibLinearModel.html) and [LibLinearCrossValidator](trait.LibLinearCrossValidator.html).
-#[derive(Clone)]
+#[derive(Default, Clone)]
 pub struct TrainingInput {
     instances: Vec<TrainingInstance>,
     last_feature_index: u32,
@@ -246,7 +246,7 @@ impl TrainingInput {
         let last_feature_index = features.iter().fold(0u32, |acc, feats| {
             feats
                 .iter()
-                .fold(acc, |acc, (i, v)| if *i > acc { *i } else { acc })
+                .fold(acc, |acc, (i, _v)| if *i > acc { *i } else { acc })
         });
 
         Ok(TrainingInput {
@@ -274,7 +274,7 @@ pub enum PredictionInputError {
 
 
 /// Test data for [LibLinearModel](trait.LibLinearModel.html).
-#[derive(Clone)]
+#[derive(Default, Clone)]
 pub struct PredictionInput {
     features: Vec<(u32, f64)>,
     last_feature_index: u32,
@@ -330,7 +330,7 @@ impl PredictionInput {
 
         let last_feature_index = features
             .iter()
-            .fold(0u32, |acc, (i, v)| if *i > acc { *i } else { acc });
+            .fold(0u32, |acc, (i, _v)| if *i > acc { *i } else { acc });
 
         Ok(PredictionInput {
             features,

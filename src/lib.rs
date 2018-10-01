@@ -11,7 +11,6 @@ extern crate num_derive;
 
 use failure::Error;
 pub use ffi::FeatureNode;
-use num::FromPrimitive;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::ptr;
@@ -76,7 +75,7 @@ pub trait LibLinearProblem: Clone {
 pub struct Problem {
     backing_store_labels: Vec<f64>,
 	backing_store_features: Vec<Vec<FeatureNode>>,
-	backing_store_feature_ptrs: Vec<*const FeatureNode>,
+	_backing_store_feature_ptrs: Vec<*const FeatureNode>,
     bound: ffi::Problem,
 }
 
@@ -144,7 +143,7 @@ impl Problem {
             },
             backing_store_labels: labels,
             backing_store_features: transformed_features,
-            backing_store_feature_ptrs: transformed_feature_ptrs,
+	        _backing_store_feature_ptrs: transformed_feature_ptrs,
         })
     }
 }
@@ -184,7 +183,7 @@ impl Clone for Problem {
             },
             backing_store_labels: labels,
             backing_store_features: transformed_features,
-            backing_store_feature_ptrs: transformed_feature_ptrs,
+	        _backing_store_feature_ptrs: transformed_feature_ptrs,
         }
     }
 }
@@ -267,9 +266,9 @@ impl SolverType {
 	/// Supported solvers: L2R_LR, L1R_LR, L2R_LR_DUAL.
 	pub fn is_logistic_regression(&self) -> bool {
 		match self {
-			L2R_LR => true,
-			L1R_LR => true,
-			L2R_LR_DUAL => true,
+			SolverType::L2R_LR => true,
+			SolverType::L1R_LR => true,
+			SolverType::L2R_LR_DUAL => true,
 			_ => false
 		}
 	}
@@ -278,9 +277,9 @@ impl SolverType {
 	/// Supported solvers: L2R_L2LOSS_SVR, L2R_L2LOSS_SVR_DUAL, L2R_L1LOSS_SVR_DUAL.
 	pub fn is_support_vector_regression(&self) -> bool {
 		match self {
-			L2R_L2LOSS_SVR => true,
-			L2R_L2LOSS_SVR_DUAL => true,
-			L2R_L1LOSS_SVR_DUAL => true,
+			SolverType::L2R_L2LOSS_SVR => true,
+			SolverType::L2R_L2LOSS_SVR_DUAL => true,
+			SolverType::L2R_L1LOSS_SVR_DUAL => true,
 			_ => false
 		}
 	}

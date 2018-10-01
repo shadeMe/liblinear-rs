@@ -1,4 +1,3 @@
-#[macro_use]
 extern crate approx;
 extern crate liblinear;
 extern crate parsnip;

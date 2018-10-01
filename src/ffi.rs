@@ -1,6 +1,6 @@
-use num::FromPrimitive;
-use std::os::raw::c_char;
+//! FFI bindings for liblinear
 
+use std::os::raw::c_char;
 
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -49,6 +49,7 @@ pub struct Model {
 }
 
 #[doc(hidden)]
+#[allow(dead_code)]
 extern "C" {
     pub static liblinear_version: i32;
 
