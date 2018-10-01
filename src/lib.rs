@@ -614,24 +614,22 @@ pub trait LibLinearCrossValidator: HasLibLinearProblem + HasLibLinearParameter {
 	/// Number of folds must be >= 2.
     fn cross_validation(&self, folds: i32) -> Result<Vec<f64>, ModelError>;
 
-	/// Performs k-folds in 0..(*bound).nr_class {
-	backing_store_labels.push( * ( * bound).label.offset(i as isize));
-} cross-validation to find the best cost value (parameter _C_) within the
-/// closed search range `(start_C, end_C)` and returns a tuple of the following values:
-///
-/// * The best cost value.
-/// * The accuracy of the best cost value.
-///
-/// Cross validation is conducted many times under the following values of _C_:
-/// * `start_C`
-/// * 2 * `start_C`
-/// * 4 * `start_C`
-/// * 8 * `start_C`, and so on
-///
-/// ...and finds the best one with the highest cross validation accuracy. The procedure stops when
-/// the models of all folds become stable or the cost reaches `end_C`.
-///
-/// If `start_C` is <= 0, an appropriately small value is automatically calculated and used instead.
+	/// Performs k-folds cross-validation to find the best cost value (parameter _C_) within the
+	/// closed search range `(start_C, end_C)` and returns a tuple of the following values:
+	///
+	/// * The best cost value.
+	/// * The accuracy of the best cost value.
+	///
+	/// Cross validation is conducted many times under the following values of _C_:
+	/// * `start_C`
+	/// * 2 * `start_C`
+	/// * 4 * `start_C`
+	/// * 8 * `start_C`, and so on
+	///
+	/// ...and finds the best one with the highest cross validation accuracy. The procedure stops when
+	/// the models of all folds become stable or the cost reaches `end_C`.
+	///
+	/// If `start_C` is <= 0, an appropriately small value is automatically calculated and used instead.
     fn find_optimal_constraints_violation_cost(
         &self,
         folds: i32,
@@ -643,7 +641,7 @@ pub trait LibLinearCrossValidator: HasLibLinearProblem + HasLibLinearParameter {
 struct Model {
     problem: Option<Problem>,
     parameter: Parameter,
-backing_store_labels: Vec < i32 >,
+	backing_store_labels: Vec<i32>,
     bound: *mut ffi::Model,
 }
 
@@ -663,14 +661,14 @@ impl Model {
             }
         }
 
-let mut backing_store_labels = Vec::< i32 >::new();
-unsafe {
-if train {
-for i in 0..( * bound).nr_class {
-backing_store_labels.push( * ( * bound).label.offset(i as isize));
-}
-}
-}
+	    let mut backing_store_labels = Vec::<i32>::new();
+	    unsafe {
+		    if train {
+			    for i in 0..(*bound).nr_class {
+				    backing_store_labels.push(*(*bound).label.offset(i as isize));
+			    }
+		    }
+	    }
 
         Ok(Model {
             problem: Some(problem),
@@ -681,113 +679,113 @@ backing_store_labels.push( * ( * bound).label.offset(i as isize));
     }
 
     fn from_serialized_file(path_to_serialized_model: &str) -> Result<Model, ModelError> {
-unsafe {
-let file_path_cstr = CString::new(path_to_serialized_model).unwrap();
-let bound = ffi::load_model(file_path_cstr.as_ptr());
+	    unsafe {
+		    let file_path_cstr = CString::new(path_to_serialized_model).unwrap();
+		    let bound = ffi::load_model(file_path_cstr.as_ptr());
 
-if bound.is_null() {
-return Err(ModelError::SerializationError {
-e: "load_model() returned a NULL pointer"
-.to_owned()
-.to_string(),
-});
-}
+		    if bound.is_null() {
+			    return Err(ModelError::SerializationError {
+				    e: "load_model() returned a NULL pointer"
+					    .to_owned()
+					    .to_string(),
+			    });
+		    }
 
-let mut backing_store_labels = Vec::< i32 >::new();
-for i in 0..(* bound).nr_class {
-backing_store_labels.push( * ( * bound).label.offset(i as isize));
-}
+		    let mut backing_store_labels = Vec::<i32>::new();
+		    for i in 0..(*bound).nr_class {
+			    backing_store_labels.push(*(*bound).label.offset(i as isize));
+		    }
 
-Ok(Model {
-problem: None,
-// solver_type is the only parameter that's serialized to disk
-// init the parameter object with just that and pass the defaults for the rest
-parameter: Parameter::new(
-num::FromPrimitive::from_i32(( * bound).param.solver_type).unwrap(),
-0.01,
-1.0,
-0.1,
-Vec::new(),
-Vec::new(),
-Vec::new(),
-).unwrap(),
-backing_store_labels,
-bound,
-})
+		    Ok(Model {
+			    problem: None,
+			    // solver_type is the only parameter that's serialized to disk
+			    // init the parameter object with just that and pass the defaults for the rest
+			    parameter: Parameter::new(
+				    num::FromPrimitive::from_i32((*bound).param.solver_type).unwrap(),
+				    0.01,
+				    1.0,
+				    0.1,
+				    Vec::new(),
+				    Vec::new(),
+				    Vec::new(),
+			    ).unwrap(),
+			    backing_store_labels,
+			    bound,
+		    })
         }
     }
 
     fn preprocess_prediction_input(
-    & self,
-    prediction_input: PredictionInput,
+	    &self,
+	    prediction_input: PredictionInput,
     ) -> Result<Vec<FeatureNode>, PredictionInputError> {
         assert_ne!(self.bound.is_null(), true);
 
         let last_feature_index = prediction_input.last_feature_index() as i32;
         if last_feature_index as usize != self.num_features() {
-        return Err(PredictionInputError::DataError {
-        e: format ! (
-        "Expected {} features, found {} instead",
-        self.num_features(),
-        last_feature_index
-        ).to_string(),
-        });
+	        return Err(PredictionInputError::DataError {
+		        e: format!(
+			        "Expected {} features, found {} instead",
+			        self.num_features(),
+			        last_feature_index
+		        ).to_string(),
+	        });
         }
 
         let bias = unsafe { (*self.bound).bias };
         let has_bias = bias >= 0f64;
-        let mut data: Vec < FeatureNode > = prediction_input
+	    let mut data: Vec<FeatureNode> = prediction_input
             .yield_data()
             .iter()
-        .map(| (index, value) | FeatureNode {
+		    .map(|(index, value)| FeatureNode {
                 index: *index as i32,
                 value: *value,
             })
             .collect();
 
         if has_bias {
-data.push(FeatureNode {
-index: last_feature_index + 1,
+	        data.push(FeatureNode {
+		        index: last_feature_index + 1,
                 value: bias,
             });
         }
 
-data.push(FeatureNode {
+	    data.push(FeatureNode {
             index: -1,
             value: 0f64,
         });
 
-Ok(data)
+	    Ok(data)
     }
 }
 
 impl HasLibLinearProblem for Model {
-type Output = Problem;
+	type Output = Problem;
 
-fn problem( & self) -> Option < & Self::Output > {
-self.problem.as_ref()
-}
+	fn problem(&self) -> Option<&Self::Output> {
+		self.problem.as_ref()
+	}
 }
 
 impl HasLibLinearParameter for Model {
-type Output = Parameter;
+	type Output = Parameter;
 
-fn parameter( & self) -> & Self::Output {
-& self.parameter
+	fn parameter(&self) -> &Self::Output {
+		&self.parameter
     }
 }
 
 impl LibLinearModel for Model {
-fn predict( & self, features: PredictionInput) -> Result < f64, ModelError > {
-Ok( self.predict_values(features) ?.1)
+	fn predict(&self, features: PredictionInput) -> Result<f64, ModelError> {
+		Ok(self.predict_values(features)?.1)
     }
 
-fn predict_values( & self, features: PredictionInput) -> Result < (Vec < f64 >, f64), ModelError > {
-let transformed_features = self.preprocess_prediction_input(features).map_err( | err | {
-ModelError::PredictionError {
-e: format ! ("{}", err).to_string(),
-}
-}) ?;
+	fn predict_values(&self, features: PredictionInput) -> Result<(Vec<f64>, f64), ModelError> {
+		let transformed_features = self.preprocess_prediction_input(features).map_err(|err| {
+			ModelError::PredictionError {
+				e: format!("{}", err).to_string(),
+			}
+		})?;
         unsafe {
             let mut output_values: Vec<f64> = match (*self.bound).nr_class {
                 2 => vec![0f64; 1],
@@ -799,25 +797,25 @@ e: format ! ("{}", err).to_string(),
                 transformed_features.as_ptr(),
                 output_values.as_mut_ptr(),
             );
-Ok((output_values, best_class))
+	        Ok((output_values, best_class))
         }
     }
 
-fn predict_probabilities(
-& self,
-features: PredictionInput,
-) -> Result < (Vec < f64 >, f64), ModelError > {
-let transformed_features = self.preprocess_prediction_input(features).map_err( | err | {
-ModelError::PredictionError {
-e: format ! ("{}", err).to_string(),
-}
-}) ?;
+	fn predict_probabilities(
+		&self,
+		features: PredictionInput,
+	) -> Result<(Vec<f64>, f64), ModelError> {
+		let transformed_features = self.preprocess_prediction_input(features).map_err(|err| {
+			ModelError::PredictionError {
+				e: format!("{}", err).to_string(),
+			}
+		})?;
 
-if ! self.parameter.solver_type().is_logistic_regression() {
-return Err(ModelError::PredictionError {
-e: "Probability output is only supported for logistic regression".to_string(),
-});
-}
+		if !self.parameter.solver_type().is_logistic_regression() {
+			return Err(ModelError::PredictionError {
+				e: "Probability output is only supported for logistic regression".to_string(),
+			});
+		}
 
         unsafe {
             let mut output_probabilities = vec![0f64; (*self.bound).nr_class as usize];
@@ -827,7 +825,7 @@ e: "Probability output is only supported for logistic regression".to_string(),
                 transformed_features.as_ptr(),
                 output_probabilities.as_mut_ptr(),
             );
-Ok((output_probabilities, best_class))
+	        Ok((output_probabilities, best_class))
         }
     }
 
@@ -843,9 +841,9 @@ Ok((output_probabilities, best_class))
         unsafe { (*self.bound).bias }
     }
 
-fn labels( & self ) -> & Vec <i32 > {
-& self.backing_store_labels
-}
+	fn labels(&self) -> &Vec<i32> {
+		&self.backing_store_labels
+	}
 
     fn num_classes(&self) -> usize {
         unsafe { (*self.bound).nr_class as usize }
@@ -855,26 +853,26 @@ fn labels( & self ) -> & Vec <i32 > {
         unsafe { (*self.bound).nr_feature as usize }
     }
 
-fn save_to_disk( & self, file_path: & str) -> Result < (), ModelError > {
-unsafe {
-let file_path_cstr = CString::new(file_path).unwrap();
-let result = ffi::save_model(file_path_cstr.as_ptr(), self.bound);
-if result == - 1 {
-return Err(ModelError::SerializationError {
-e: "save_model() returned -1".to_owned().to_string(),
-});
-}
-}
+	fn save_to_disk(&self, file_path: &str) -> Result<(), ModelError> {
+		unsafe {
+			let file_path_cstr = CString::new(file_path).unwrap();
+			let result = ffi::save_model(file_path_cstr.as_ptr(), self.bound);
+			if result == -1 {
+				return Err(ModelError::SerializationError {
+					e: "save_model() returned -1".to_owned().to_string(),
+				});
+			}
+		}
 
-Ok(())
-}
+		Ok(())
+	}
 }
 
 impl LibLinearCrossValidator for Model {
     fn cross_validation(&self, folds: i32) -> Result<Vec<f64>, ModelError> {
-assert ! (folds > = 2);
+	    assert!(folds >= 2);
 
-if self.problem.is_none() {
+	    if self.problem.is_none() {
             return Err(ModelError::InvalidState {
                 e: "Invalid problem/parameters for cross validator"
                     .to_owned()
@@ -886,10 +884,10 @@ if self.problem.is_none() {
             let mut output_labels = vec![0f64; self.problem.as_ref().unwrap().bound.l as usize];
 
             ffi::cross_validation(
-& self.problem.as_ref().unwrap().bound,
-& self.parameter.bound,
-folds,
-output_labels.as_mut_ptr(),
+	            &self.problem.as_ref().unwrap().bound,
+	            &self.parameter.bound,
+	            folds,
+	            output_labels.as_mut_ptr(),
             );
             Ok(output_labels)
         }
@@ -900,9 +898,9 @@ output_labels.as_mut_ptr(),
         folds: i32,
         search_range: (f64, f64),
     ) -> Result<(f64, f64), ModelError> {
-assert ! (folds > = 2);
+	    assert!(folds >= 2);
 
-if self.problem.is_none() {
+	    if self.problem.is_none() {
             return Err(ModelError::InvalidState {
                 e: "Invalid problem/parameters for cross validator"
                     .to_owned()
@@ -914,13 +912,13 @@ if self.problem.is_none() {
             let mut best_cost = 0f64;
             let mut best_rate = 0f64;
             ffi::find_parameter_C(
-& self.problem.as_ref().unwrap().bound,
-& self.parameter.bound,
-folds,
-search_range.0,
-search_range.1,
-& mut best_cost,
-& mut best_rate,
+	            &self.problem.as_ref().unwrap().bound,
+	            &self.parameter.bound,
+	            folds,
+	            search_range.0,
+	            search_range.1,
+	            &mut best_cost,
+	            &mut best_rate,
             );
             Ok((best_cost, best_rate))
         }
@@ -943,7 +941,7 @@ pub struct Builder {
 }
 
 impl Builder {
-/// Creates a new instance of the builder.
+	/// Creates a new instance of the builder.
     pub fn new() -> Builder {
         Builder {
             problem_builder: ProblemBuilder::new(),
@@ -951,15 +949,15 @@ impl Builder {
         }
     }
 
-/// Builder for the model's linear problem.
+	/// Builder for the model's linear problem.
     pub fn problem(&mut self) -> &mut ProblemBuilder {
         &mut self.problem_builder
     }
-/// Builder for the model's tunable parameters.
+	/// Builder for the model's tunable parameters.
     pub fn parameters(&mut self) -> &mut ParameterBuilder {
         &mut self.parameter_builder
     }
-/// Builds a [LibLinearCrossValidator](trait.LibLinearCrossValidator.html) instance with the given problem and parameters.
+	/// Builds a [LibLinearCrossValidator](trait.LibLinearCrossValidator.html) instance with the given problem and parameters.
     pub fn build_cross_validator(self) -> Result<impl LibLinearCrossValidator, Error> {
         Ok(Model::from_input(
             self.problem_builder.build()?,
@@ -967,7 +965,7 @@ impl Builder {
             false,
         )?)
     }
-/// Builds a [LibLinearModel](trait.LibLinearModel.html) instance with the given problem and parameters.
+	/// Builds a [LibLinearModel](trait.LibLinearModel.html) instance with the given problem and parameters.
     pub fn build_model(self) -> Result<impl LibLinearModel, Error> {
         Ok(Model::from_input(
             self.problem_builder.build()?,
@@ -981,21 +979,21 @@ impl Builder {
 pub struct Serializer;
 
 impl Serializer {
-/// Loads a model from disk.
-///
-/// The loaded model will have no associated [LibLinearProblem](trait.LibLinearProblem.html) instance.
-/// With the exception of the solver type, all parameters in the associated [LibLinearParameter](trait.LibLinearParameter.html) instance
-/// will be reset to their default values.
+	/// Loads a model from disk.
+	///
+	/// The loaded model will have no associated [LibLinearProblem](trait.LibLinearProblem.html) instance.
+	/// With the exception of the solver type, all parameters in the associated [LibLinearParameter](trait.LibLinearParameter.html) instance
+	/// will be reset to their default values.
     pub fn load_model(path_to_serialized_model: &str) -> Result<impl LibLinearModel, Error> {
         Ok(Model::from_serialized_file(path_to_serialized_model)?)
     }
 
-/// Saves a model to disk.
-///
-/// Convenience method that calls `save_to_disk` on the model instance.
+	/// Saves a model to disk.
+	///
+	/// Convenience method that calls `save_to_disk` on the model instance.
     pub fn save_model(
-path_to_serialized_model: & str,
-model: & impl LibLinearModel,
+		path_to_serialized_model: &str,
+		model: &impl LibLinearModel,
     ) -> Result<(), Error> {
         Ok(model.save_to_disk(path_to_serialized_model)?)
     }
@@ -1004,4 +1002,14 @@ model: & impl LibLinearModel,
 /// The version of the bundled liblinear C-library.
 pub fn liblinear_version() -> i32 {
     unsafe { ffi::liblinear_version }
+}
+
+/// Toggles the log output liblinear prints to the program's `stdout`
+pub fn toggle_liblinear_stdout_output(state: bool) {
+	unsafe {
+		match state {
+			true => ffi::set_print_string_function(None),
+			false => ffi::set_print_string_function(Some(ffi::silence_liblinear_stdout)),
+		}
+	}
 }

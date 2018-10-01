@@ -1,3 +1,4 @@
+#[macro_use]
 extern crate approx;
 extern crate liblinear;
 extern crate parsnip;
@@ -139,7 +140,10 @@ fn test_model_save_load() {
 
 #[test]
 fn test_cross_validator() {
+    toggle_liblinear_stdout_output(false);
+
     let mut model_builder = create_default_model_builder();
+    model_builder.parameters().solver_type(SolverType::L2R_LR);
     let cross_validator = model_builder.build_cross_validator().unwrap();
 
     let ground_truth = vec![
@@ -170,16 +174,9 @@ fn test_cross_validator() {
         .map(|e| *e as i32)
         .collect::<Vec<i32>>();
 
-    println!(
-        "Accuracy: {}",
-        categorical_accuracy(&predicted, &ground_truth).unwrap()
-    );
-    println!(
-        "Precision: {}",
-        precision(&predicted, &ground_truth, Average::Macro).unwrap()
-    );
-    println!(
-        "Recall: {}",
-        recall(&predicted, &ground_truth, Average::Macro).unwrap()
-    );
+    abs_diff_eq!(categorical_accuracy(&predicted, &ground_truth).unwrap(), 0.8148148);
+
+    let (best_c, acc) = cross_validator.find_optimal_constraints_violation_cost(4, (0.0, 10.0)).unwrap();
+    abs_diff_eq!(best_c, 0.125);
+    abs_diff_eq!(acc, 0.8407407);
 }

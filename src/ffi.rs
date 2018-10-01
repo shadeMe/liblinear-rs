@@ -95,4 +95,9 @@ extern "C" {
     pub fn check_parameter(prob: *const Problem, param: *const Parameter) -> *const c_char;
     pub fn check_probability_model(model_: *const Model) -> i32;
     pub fn check_regression_model(model_: *const Model) -> i32;
+
+	pub fn set_print_string_function(func: Option<extern "C" fn(*const c_char)>);
 }
+
+#[doc(hidden)]
+pub extern "C" fn silence_liblinear_stdout(_c: *const c_char) {}
