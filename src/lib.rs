@@ -184,7 +184,7 @@ impl Clone for Problem {
     }
 }
 
-/// Builder for [LibLinearProblem](enum.LibLinearProblem.html)
+/// Builder for [LibLinearProblem](enum.LibLinearProblem.html).
 pub struct ProblemBuilder {
     input_data: Option<TrainingInput>,
     bias: f64,
@@ -418,7 +418,7 @@ impl Clone for Parameter {
     }
 }
 
-/// Builder for [LibLinearParameter](enum.LibLinearParameter.html)
+/// Builder for [LibLinearParameter](enum.LibLinearParameter.html).
 pub struct ParameterBuilder {
     solver_type: SolverType,
     epsilon: f64,
@@ -444,7 +444,7 @@ impl ParameterBuilder {
 
 	/// Set solver type.
 	///
-	/// Default: L2R_LR
+	/// Default: [L2R_LR](enum.SolverType.html#variant.L2R_LR)
     pub fn solver_type(&mut self, solver_type: SolverType) -> &mut Self {
         self.solver_type = solver_type;
         self
@@ -916,6 +916,8 @@ impl Drop for Model {
     }
 }
 
+
+/// Primary model builder.
 pub struct Builder {
     problem_builder: ProblemBuilder,
     parameter_builder: ParameterBuilder,
