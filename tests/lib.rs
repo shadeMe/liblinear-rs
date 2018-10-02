@@ -111,9 +111,9 @@ fn test_model_dense_data() {
     assert_eq!(model.num_classes(), 3);
 
     let class = model
-        .predict(util::PredictionInput::from_dense_features(vec![1.1, 0.0, 8.4]).unwrap())
+        .predict(util::PredictionInput::from_dense_features(vec![1.2, 1.0, 9.0]).unwrap())
         .unwrap();
-    assert_eq!(class, 0f64);
+    assert_eq!(class, 3f64);
 }
 
 #[test]
@@ -122,6 +122,7 @@ fn test_model_save_load() {
     model_builder.problem().bias(10.2);
 
     let model = model_builder.build_model().unwrap();
+    let model_labels = model.labels().clone();
     assert_eq!(model.num_classes(), 2);
     assert_eq!(
         model.parameter().solver_type().is_logistic_regression(),
@@ -136,6 +137,7 @@ fn test_model_save_load() {
     let model = model.unwrap();
     assert_eq!(model.num_classes(), 2);
     assert_eq!(model.bias(), 10.2);
+    assert_eq!(model.labels(), &model_labels);
 }
 
 #[test]
@@ -174,6 +176,7 @@ fn test_cross_validator() {
         .map(|e| *e as i32)
         .collect::<Vec<i32>>();
 
+    // RHS was taken from the output of liblinear's bundled trainer program
     abs_diff_eq!(categorical_accuracy(&predicted, &ground_truth).unwrap(), 0.8148148);
 
     let (best_c, acc) = cross_validator.find_optimal_constraints_violation_cost(4, (0.0, 10.0)).unwrap();
