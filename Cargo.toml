@@ -1,0 +1,20 @@
+[package]
+name = "liblinear"
+version = "0.1.0"
+authors = ["Madeesh Kannan"]
+
+build = "build.rs"
+links = "liblinear.a"
+
+description = "Rust bindings for the liblinear C++ library"
+repository = "https://github.com/shadeMe/liblinear-rs"
+keywords = ["machine learning", "statistics", "svm", "support vector machines", "linear model"]
+license = "MIT"
+
+[dependencies]
+failure = "0.1.2"
+parsnip = "0.3.0"
+approx = "0.3.0"
+
+[build-dependencies]
+cc = "1.0"
