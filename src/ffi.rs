@@ -6,9 +6,9 @@ use std::os::raw::c_char;
 #[repr(C)]
 /// Represents a single feature in a sparse feature vector.
 pub struct FeatureNode {
-	/// One-based index of the feature in the feature vector.
+    /// One-based index of the feature in the feature vector.
     pub index: i32,
-	/// Value corresponding to the feature.
+    /// Value corresponding to the feature.
     pub value: f64,
 }
 
@@ -96,7 +96,7 @@ extern "C" {
     pub fn check_probability_model(model_: *const Model) -> i32;
     pub fn check_regression_model(model_: *const Model) -> i32;
 
-	pub fn set_print_string_function(func: Option<extern "C" fn(*const c_char)>);
+    pub fn set_print_string_function(func: Option<extern "C" fn(*const c_char)>);
 }
 
 #[doc(hidden)]

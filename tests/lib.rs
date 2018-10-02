@@ -177,9 +177,14 @@ fn test_cross_validator() {
         .collect::<Vec<i32>>();
 
     // RHS was taken from the output of liblinear's bundled trainer program
-    abs_diff_eq!(categorical_accuracy(&predicted, &ground_truth).unwrap(), 0.8148148);
+    abs_diff_eq!(
+        categorical_accuracy(&predicted, &ground_truth).unwrap(),
+        0.8148148
+    );
 
-    let (best_c, acc) = cross_validator.find_optimal_constraints_violation_cost(4, (0.0, 10.0)).unwrap();
+    let (best_c, acc) = cross_validator
+        .find_optimal_constraints_violation_cost(4, (0.0, 10.0))
+        .unwrap();
     abs_diff_eq!(best_c, 0.125);
     abs_diff_eq!(acc, 0.8407407);
 }
