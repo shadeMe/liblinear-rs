@@ -705,7 +705,8 @@ impl Model {
                     Vec::new(),
                     Vec::new(),
                     Vec::new(),
-                ).unwrap(),
+                )
+                .unwrap(),
                 backing_store_labels,
                 bound,
             })
@@ -725,7 +726,8 @@ impl Model {
                     "Expected {} features, found {} instead",
                     self.num_features(),
                     last_feature_index
-                ).to_string(),
+                )
+                .to_string(),
             });
         }
 
