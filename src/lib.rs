@@ -6,12 +6,14 @@
 #[macro_use]
 extern crate failure;
 
-use failure::Error;
-pub use ffi::FeatureNode;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::mem;
 use std::ptr;
+
+use failure::Error;
+
+pub use ffi::FeatureNode;
 use util::*;
 
 mod ffi;
@@ -79,9 +81,9 @@ pub enum ModelError {
 /// either integers (in classification) or real numbers (in regression).
 pub trait LibLinearProblem: Clone {
     /// The feature vectors of each training instance.
-    fn source_features(&self) -> &Vec<Vec<FeatureNode>>;
+    fn source_features(&self) -> &[Vec<FeatureNode>];
     /// Target labels/values of each training instance.
-    fn target_values(&self) -> &Vec<f64>;
+    fn target_values(&self) -> &[f64];
     /// Bias of the input data.
     fn bias(&self) -> f64;
 }
@@ -161,11 +163,11 @@ impl Problem {
 }
 
 impl LibLinearProblem for Problem {
-    fn source_features(&self) -> &Vec<Vec<FeatureNode>> {
+	fn source_features(&self) -> &[Vec<FeatureNode>] {
         &self.backing_store_features
     }
 
-    fn target_values(&self) -> &Vec<f64> {
+	fn target_values(&self) -> &[f64] {
         &self.backing_store_labels
     }
 
@@ -177,11 +179,7 @@ impl LibLinearProblem for Problem {
 impl Clone for Problem {
     fn clone(&self) -> Self {
         let labels = self.backing_store_labels.clone();
-        let transformed_features: Vec<Vec<FeatureNode>> = self
-            .backing_store_features
-            .iter()
-            .map(|e| (*e).clone())
-            .collect();
+	    let transformed_features: Vec<Vec<FeatureNode>> = self.backing_store_features.clone();
         let transformed_feature_ptrs: Vec<*const FeatureNode> =
             transformed_features.iter().map(|e| e.as_ptr()).collect();
 
@@ -277,9 +275,7 @@ impl SolverType {
     /// Supported solvers: L2R_LR, L1R_LR, L2R_LR_DUAL.
     pub fn is_logistic_regression(&self) -> bool {
         match self {
-            SolverType::L2R_LR => true,
-            SolverType::L1R_LR => true,
-            SolverType::L2R_LR_DUAL => true,
+	        SolverType::L2R_LR | SolverType::L1R_LR | SolverType::L2R_LR_DUAL => true,
             _ => false,
         }
     }
@@ -288,9 +284,9 @@ impl SolverType {
     /// Supported solvers: L2R_L2LOSS_SVR, L2R_L2LOSS_SVR_DUAL, L2R_L1LOSS_SVR_DUAL.
     pub fn is_support_vector_regression(&self) -> bool {
         match self {
-            SolverType::L2R_L2LOSS_SVR => true,
-            SolverType::L2R_L2LOSS_SVR_DUAL => true,
-            SolverType::L2R_L1LOSS_SVR_DUAL => true,
+	        SolverType::L2R_L2LOSS_SVR
+	        | SolverType::L2R_L2LOSS_SVR_DUAL
+	        | SolverType::L2R_L1LOSS_SVR_DUAL => true,
             _ => false,
         }
     }
@@ -705,7 +701,8 @@ impl Model {
                     Vec::new(),
                     Vec::new(),
                     Vec::new(),
-                ).unwrap(),
+                )
+	                .unwrap(),
                 backing_store_labels,
                 bound,
             })
@@ -725,7 +722,8 @@ impl Model {
                     "Expected {} features, found {} instead",
                     self.num_features(),
                     last_feature_index
-                ).to_string(),
+                )
+	                .to_string(),
             });
         }
 
@@ -867,9 +865,13 @@ impl LibLinearModel for Model {
 
 impl LibLinearCrossValidator for Model {
     fn cross_validation(&self, folds: i32) -> Result<Vec<f64>, ModelError> {
-        assert!(folds >= 2);
-
-        if self.problem.is_none() {
+	    if folds < 2 {
+		    return Err(ModelError::InvalidState {
+			    e: "Number of folds must be >= 2 for cross validator"
+				    .to_owned()
+				    .to_string(),
+		    });
+	    } else if self.problem.is_none() {
             return Err(ModelError::InvalidState {
                 e: "Invalid problem/parameters for cross validator"
                     .to_owned()
@@ -895,9 +897,13 @@ impl LibLinearCrossValidator for Model {
         folds: i32,
         search_range: (f64, f64),
     ) -> Result<(f64, f64), ModelError> {
-        assert!(folds >= 2);
-
-        if self.problem.is_none() {
+	    if folds < 2 {
+		    return Err(ModelError::InvalidState {
+			    e: "Number of folds must be >= 2 for cross validator"
+				    .to_owned()
+				    .to_string(),
+		    });
+	    } else if self.problem.is_none() {
             return Err(ModelError::InvalidState {
                 e: "Invalid problem/parameters for cross validator"
                     .to_owned()
