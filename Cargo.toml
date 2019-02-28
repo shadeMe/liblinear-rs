@@ -8,7 +8,7 @@ links = "liblinear.a"
 
 description = "Rust bindings for the liblinear C++ library"
 repository = "https://github.com/shadeMe/liblinear-rs"
-keywords = ["machine learning", "statistics", "svm", "support vector machines", "linear model"]
+keywords = ["machine-learning", "statistics", "svm", "support-vector-machines", "linear-model"]
 license = "MIT"
 
 [dependencies]
