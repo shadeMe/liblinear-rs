@@ -1,5 +1,5 @@
 [package]
-name = "liblinear"
+name = "liblinear-rs"
 version = "0.1.0"
 authors = ["Madeesh Kannan"]
 

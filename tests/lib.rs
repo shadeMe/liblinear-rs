@@ -3,8 +3,9 @@ extern crate approx;
 extern crate liblinear;
 extern crate parsnip;
 
-use liblinear::*;
 use parsnip::*;
+
+use liblinear::*;
 
 fn create_default_model_builder() -> Builder {
     let libsvm_data = util::TrainingInput::from_libsvm_file("tests/data/heart_scale").unwrap();
@@ -49,7 +50,8 @@ fn test_training_input_libsvm_data() {
             util::PredictionInput::from_dense_features(vec![
                 -0.5, -1.0, 0.333333, -0.660377, -0.351598, -1.0, 1.0, 0.541985, 1.0, -1.0, -1.0,
                 -1.0, -1.0,
-            ]).unwrap(),
+            ])
+	            .unwrap(),
         )
         .unwrap();
     assert_eq!(class, -1f64);
@@ -166,9 +168,10 @@ fn test_cross_validator() {
         -1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, 1.0,
         -1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0,
         1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, 1.0,
-    ].iter()
-        .map(|e| *e as i32)
-        .collect::<Vec<i32>>();
+    ]
+	    .iter()
+	    .map(|e| *e as i32)
+	    .collect::<Vec<i32>>();
     let predicted = cross_validator
         .cross_validation(4)
         .unwrap()

@@ -65,12 +65,12 @@ impl FromStr for TrainingInstance {
             0 => {
                 return Err(TrainingInputError::ParseError {
                     e: "Empty line".to_string(),
-                })
+                });
             }
             1 => {
                 return Err(TrainingInputError::ParseError {
                     e: "No features found".to_string(),
-                })
+                });
             }
             _ => {
                 let mut label = 0f64;
@@ -176,18 +176,19 @@ impl TrainingInput {
     /// Feature indices start from 1 and increase monotonically. However, they do not need to be continuous.
     pub fn from_libsvm_file(path: &str) -> Result<TrainingInput, TrainingInputError> {
         let mut out = TrainingInput::default();
-        let reader = BufReader::new(File::open(path).map_err(|io_err| {
-            TrainingInputError::IoError {
-                e: io_err.to_string(),
-            }
-        })?);
+	    let reader =
+		    BufReader::new(
+			    File::open(path).map_err(|io_err| TrainingInputError::IoError {
+				    e: io_err.to_string(),
+			    })?,
+		    );
 
         for line in reader.lines() {
             let mut new_training_instance = TrainingInstance::from_str(
-                line.map_err(|io_err| TrainingInputError::IoError {
+	            line.map_err(|io_err| TrainingInputError::IoError {
                     e: io_err.to_string(),
                 })?
-                    .as_str(),
+		            .as_str(),
             )?;
 
             out.last_feature_index = new_training_instance.last_feature_index;
