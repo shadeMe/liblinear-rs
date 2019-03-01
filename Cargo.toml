@@ -6,9 +6,11 @@ authors = ["Madeesh Kannan"]
 build = "build.rs"
 links = "liblinear.a"
 
+readme = "README.md"
 description = "Rust bindings for the liblinear C++ library"
 repository = "https://github.com/shadeMe/liblinear-rs"
 keywords = ["machine-learning", "statistics", "svm", "linear-model"]
+categories = ["api-bindings", "science", "simulation"]
 license = "MIT"
 
 [dependencies]

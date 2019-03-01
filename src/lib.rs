@@ -1,7 +1,7 @@
 //! # liblinear
 //!
 //! `liblinear` is a Rust wrapper for the [LIBLINEAR](https://www.csie.ntu.edu.tw/~cjlin/liblinear/)
-//! C++ machine learning library.
+//! C/C++ machine learning library.
 
 #[macro_use]
 extern crate failure;
