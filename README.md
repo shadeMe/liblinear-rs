@@ -49,6 +49,7 @@ More examples can be found in the bundled unit tests.
 
 
 # Changelog
+0.1.1 - Added readme, minor documentation fixes.  
 0.1.0 - Initial release.
 
 
