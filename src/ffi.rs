@@ -50,6 +50,7 @@ pub struct Model {
 
 #[doc(hidden)]
 #[allow(dead_code)]
+#[allow(non_snake_case)]
 extern "C" {
     pub static liblinear_version: i32;
 
@@ -60,13 +61,14 @@ extern "C" {
         nr_fold: i32,
         target: *mut f64,
     );
-    pub fn find_parameter_C(
+    pub fn find_parameters(
         prob: *const Problem,
         param: *const Parameter,
         nr_fold: i32,
         start_C: f64,
-        max_C: f64,
+        start_p: f64,
         best_C: *mut f64,
+        best_p: *mut f64,
         best_rate: *mut f64,
     );
 

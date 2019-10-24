@@ -22,7 +22,7 @@ pub mod util;
 /// Errors related to a model's parameters.
 #[derive(Debug, Fail)]
 pub enum ParameterError {
-    /// The model's parameters are either incomplete or invalid.
+	/// One or more of the model's parameters are either incomplete or invalid.
     #[fail(display = "parameter error: {}", e)]
     InvalidParameters {
         #[doc(hidden)]
@@ -67,6 +67,12 @@ pub enum ModelError {
         #[doc(hidden)]
         e: String,
     },
+	/// One or more of the arguments passed to the API call are invalid.
+	#[fail(display = "illegal argument: {}", e)]
+	IllegalArgument {
+		#[doc(hidden)]
+		e: String,
+	},
     /// The model encountered an unexpected internal error.
     #[fail(display = "unknown error: {}", e)]
     UnknownError {
@@ -547,6 +553,8 @@ pub trait LibLinearModel: HasLibLinearProblem + HasLibLinearParameter {
     ///	is returned.
     ///
     ///   The values correspond to the classes returned by the `labels` method.
+    ///
+    ///
     /// * The class with the highest decision value.
     fn predict_values(&self, features: PredictionInput) -> Result<(Vec<f64>, f64), ModelError>;
 
@@ -556,6 +564,8 @@ pub trait LibLinearModel: HasLibLinearProblem + HasLibLinearParameter {
     /// indicating the probability that the testing instance is in each class.
     ///
     ///   The values correspond to the classes returned by the `labels` method.
+    ///
+    ///
     /// * The class with the highest probability.
     ///
     /// Only supports logistic regression solvers.
@@ -574,10 +584,10 @@ pub trait LibLinearModel: HasLibLinearProblem + HasLibLinearParameter {
     /// For regression models, the label index is ignored.
     fn feature_coefficient(&self, feature_index: i32, label_index: i32) -> f64;
 
-    /// Returns the bias term corresponding to the class with the given index
-    ///
-    /// For classification models, if label index is not in a valid range, a zero value will be returned.
-    /// For regression models, the label index is ignored.
+	/// Returns the bias term corresponding to the class with the given index.
+	///
+	/// For classification models, if label index is not in a valid range, a zero value will be returned.
+	/// For regression models, the label index is ignored.
     fn label_bias(&self, label_index: i32) -> f64;
 
     /// Returns the bias of the input data with which the model was trained.
@@ -607,27 +617,37 @@ pub trait LibLinearCrossValidator: HasLibLinearProblem + HasLibLinearParameter {
     /// Number of folds must be >= 2.
     fn cross_validation(&self, folds: i32) -> Result<Vec<f64>, ModelError>;
 
-    /// Performs k-folds cross-validation to find the best cost value (parameter _C_) within the
-    /// closed search range `(start_C, end_C)` and returns a tuple of the following values:
-    ///
-    /// * The best cost value.
-    /// * The accuracy of the best cost value.
-    ///
-    /// Cross validation is conducted many times under the following values of _C_:
-    /// * `start_C`
-    /// * 2 * `start_C`
-    /// * 4 * `start_C`
-    /// * 8 * `start_C`, and so on
-    ///
-    /// ...and finds the best one with the highest cross validation accuracy. The procedure stops when
-    /// the models of all folds become stable or the cost reaches `end_C`.
-    ///
-    /// If `start_C` is <= 0, an appropriately small value is automatically calculated and used instead.
-    fn find_optimal_constraints_violation_cost(
-        &self,
-        folds: i32,
-        search_range: (f64, f64),
-    ) -> Result<(f64, f64), ModelError>;
+	/// Performs k-folds cross-validation to find the best cost value (parameter _C_) and regression
+	/// loss sensitivity (parameter _p_) and returns a tuple with the following values:
+	///
+	/// * The best cost value.
+	/// * The accuracy of the best cost value (classification) or mean squared error (regression).
+	/// * The best regression loss sensitivity value (only for regression).
+	///
+	/// Supported Solvers:
+	/// * L2R_LR, L2R_L2LOSS_SVC - Cross validation is conducted many times with values of `_C_
+	/// = n * start_C; n = 1, 2, 4, 8...` to find the value with the highest cross validation
+	/// accuracy. The procedure stops when the models of all folds become stable or when the cost
+	/// reaches the upper-bound `max_cost = 1024`. If `start_cost` is <= 0, an appropriately small value is
+	/// automatically calculated and used instead.
+	///
+	///
+	/// * L2R_L2LOSS_SVR - Cross validation is conducted in a two-fold loop. The outer loop
+	/// iterates over the values of `_p_ = n / (20 * max_loss_sensitivity); n = 19, 18, 17...0`. For each value
+	/// of _p_, the inner loop performs cross validation with values of `_C_ = n * start_C; n = 1, 2,
+	/// 4, 8...` to find the value with the lowest mean squared error. The procedure stops when the
+	/// models of all folds become stable or when the cost reaches the upper-bound `max_cost = 1048576`. If
+	/// `start_cost` is <= 0, an appropriately small value is automatically calculated and used instead.
+	///
+	///   `max_p` is automatically calculated from the problem's training data.
+	/// If `start_loss_sensitivity` is <= 0, it is set to `max_loss_sensitivity`. Otherwise, the outer
+	/// loop starts with the first `_p_ = n / (20 * max_p)` that is <= `start_loss_sensitivity`.
+	fn find_optimal_constraints_violation_cost_and_loss_sensitivity(
+		&self,
+		folds: i32,
+		start_cost: f64,
+		start_loss_sensitivity: f64,
+	) -> Result<(f64, f64, f64), ModelError>;
 }
 
 #[doc(hidden)]
@@ -866,7 +886,7 @@ impl LibLinearModel for Model {
 impl LibLinearCrossValidator for Model {
     fn cross_validation(&self, folds: i32) -> Result<Vec<f64>, ModelError> {
         if folds < 2 {
-            return Err(ModelError::InvalidState {
+	        return Err(ModelError::IllegalArgument {
                 e: "Number of folds must be >= 2 for cross validator"
                     .to_owned()
                     .to_string(),
@@ -892,13 +912,14 @@ impl LibLinearCrossValidator for Model {
         }
     }
 
-    fn find_optimal_constraints_violation_cost(
-        &self,
-        folds: i32,
-        search_range: (f64, f64),
-    ) -> Result<(f64, f64), ModelError> {
+	fn find_optimal_constraints_violation_cost_and_loss_sensitivity(
+		&self,
+		folds: i32,
+		start_cost: f64,
+		start_loss_sensitivity: f64,
+	) -> Result<(f64, f64, f64), ModelError> {
         if folds < 2 {
-            return Err(ModelError::InvalidState {
+	        return Err(ModelError::IllegalArgument {
                 e: "Number of folds must be >= 2 for cross validator"
                     .to_owned()
                     .to_string(),
@@ -914,16 +935,18 @@ impl LibLinearCrossValidator for Model {
         unsafe {
             let mut best_cost = 0f64;
             let mut best_rate = 0f64;
-            ffi::find_parameter_C(
-                &self.problem.as_ref().unwrap().bound,
-                &self.parameter.bound,
-                folds,
-                search_range.0,
-                search_range.1,
-                &mut best_cost,
-                &mut best_rate,
+	        let mut best_loss_sensitivity = 0f64;
+	        ffi::find_parameters(
+		        &self.problem.as_ref().unwrap().bound,
+		        &self.parameter.bound,
+		        folds,
+		        start_cost,
+		        start_loss_sensitivity,
+		        &mut best_cost,
+		        &mut best_loss_sensitivity,
+		        &mut best_rate,
             );
-            Ok((best_cost, best_rate))
+	        Ok((best_cost, best_rate, best_loss_sensitivity))
         }
     }
 }

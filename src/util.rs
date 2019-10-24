@@ -184,7 +184,7 @@ impl TrainingInput {
 		    );
 
         for line in reader.lines() {
-            let mut new_training_instance = TrainingInstance::from_str(
+	        let new_training_instance = TrainingInstance::from_str(
 	            line.map_err(|io_err| TrainingInputError::IoError {
                     e: io_err.to_string(),
                 })?

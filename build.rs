@@ -3,7 +3,6 @@ extern crate cc;
 fn main() {
     cc::Build::new()
         .cpp(true)
-        .cpp_link_stdlib("stdc++")
         .flag("-O3")
         .file("liblinear/linear.cpp")
         .file("liblinear/tron.cpp")

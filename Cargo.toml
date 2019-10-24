@@ -1,6 +1,6 @@
 [package]
 name = "liblinear"
-version = "0.1.1"
+version = "1.0.0"
 authors = ["Madeesh Kannan"]
 
 build = "build.rs"
@@ -14,9 +14,9 @@ categories = ["api-bindings", "science", "simulation"]
 license = "MIT"
 
 [dependencies]
-failure = "0.1.2"
+failure = "0.1.6"
 parsnip = "0.3.0"
-approx = "0.3.0"
+approx = "0.3.2"
 
 [build-dependencies]
-cc = "1.0"
+cc = "1.0.46"

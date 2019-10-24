@@ -18,7 +18,7 @@ fn create_default_model_builder() -> Builder {
 
 #[test]
 fn test_version() {
-    assert_eq!(liblinear_version(), 220);
+    assert_eq!(liblinear_version(), 230);
 }
 
 #[test]
@@ -185,9 +185,10 @@ fn test_cross_validator() {
         0.8148148
     );
 
-    let (best_c, acc) = cross_validator
-        .find_optimal_constraints_violation_cost(4, (0.0, 10.0))
+    let (best_c, acc, best_p) = cross_validator
+        .find_optimal_constraints_violation_cost_and_loss_sensitivity(4, 0.0, 0.0)
         .unwrap();
-    abs_diff_eq!(best_c, 0.125);
+    abs_diff_eq!(best_c, 0.00390625);
     abs_diff_eq!(acc, 0.8407407);
+    assert_eq!(best_p, -1f64);
 }
