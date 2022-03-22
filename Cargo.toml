@@ -2,7 +2,7 @@
 name = "liblinear"
 version = "2.0.0"
 authors = ["Madeesh Kannan"]
-
+edition = "2021"
 build = "build.rs"
 links = "liblinear.a"
 

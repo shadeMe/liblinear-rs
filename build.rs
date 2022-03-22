@@ -5,7 +5,7 @@ fn main() {
         .cpp(true)
         .flag("-O2")
         .file("liblinear/linear.cpp")
-        .file("liblinear/tron.cpp")
+        .file("liblinear/newton.cpp")
         .file("liblinear/blas/daxpy.c")
         .file("liblinear/blas/ddot.c")
         .file("liblinear/blas/dnrm2.c")

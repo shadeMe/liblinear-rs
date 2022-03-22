@@ -9,12 +9,11 @@ Provides a thin (but rustic) wrapper around the original C-interface exposed by 
 
 
 # Usage
-Use the `liblinear::Builder` API to train a model on sparse features and 
+Use the `liblinear::Builder` API to train a model on sparse features and
 predict the class of a new instance.
 
 
 ```rust
-extern crate liblinear;
 use liblinear::*;
 
 let x: Vec<Vec<(u32, f64)>> = vec![
@@ -24,7 +23,7 @@ let x: Vec<Vec<(u32, f64)>> = vec![
     ];
 let y = vec![0.0, 1.0, 0.0];
 
-let mut model_builder = liblinear::Builder::new();
+let mut model_builder = liblinear::Builder::default();
 model_builder
     .problem()
     .input_data(util::TrainingInput::from_sparse_features(y, x).unwrap())
@@ -45,12 +44,12 @@ let predicted_class = model
 println!(predicted_class);
 ```
 
-More examples can be found in the bundled unit tests. 
+More examples can be found in the bundled unit tests.
 
 
 # Changelog
-1.0.0 - Update liblinear to v230 (breaking changes), minor changes and fixes.  
-0.1.1 - Added readme, minor documentation fixes.  
+1.0.0 - Update liblinear to v230 (breaking changes), minor changes and fixes.
+0.1.1 - Added readme, minor documentation fixes.
 0.1.0 - Initial release.
 
 

@@ -14,13 +14,13 @@ pub trait LibLinearModel: HasLibLinearProblem + HasLibLinearParameter {
     /// Returns one of the following values:
     ///
     /// * For a classification model, the predicted class is returned.
-    /// * For a regression model, the function value of x calculated using the model is returned.
+    /// * For a regression model, the function value of `x` calculated using the model is returned.
     fn predict(&self, features: PredictionInput) -> Result<f64, ModelError>;
 
     /// Returns a tuple of the following values:
     ///
-    /// * A list of decision values. If k is the number of classes, each element includes results
-    /// of predicting k binary-class SVMs. If k=2 and solver is not MCSVM_CS, only one decision value
+    /// * A list of decision values. If `k` is the number of classes, each element includes results
+    /// of predicting k binary-class SVMs. If `k == 2` and solver is not `MCSVM_CS`, only one decision value
     ///	is returned.
     ///
     ///   The values correspond to the classes returned by the `labels` method.
@@ -31,7 +31,7 @@ pub trait LibLinearModel: HasLibLinearProblem + HasLibLinearParameter {
 
     /// Returns a tuple of the following values:
     ///
-    /// * A list of probability estimates. each element contains k values
+    /// * A list of probability estimates. each element contains `k` values
     /// indicating the probability that the testing instance is in each class.
     ///
     ///   The values correspond to the classes returned by the `labels` method.
@@ -48,7 +48,7 @@ pub trait LibLinearModel: HasLibLinearProblem + HasLibLinearParameter {
     /// Returns the coefficient for the feature with the given index
     /// and the class with the given (label) index.
     ///
-    /// Note that while feature indices start from 1, label indices start from 0.
+    /// Note that while feature indices start from `1`, label indices start from `0`.
     /// If the feature index is not in the valid range, a zero value will be returned.
     ///
     /// For classification models, if the label index is not in the valid range, a zero value will be returned.
@@ -59,7 +59,14 @@ pub trait LibLinearModel: HasLibLinearProblem + HasLibLinearParameter {
     ///
     /// For classification models, if label index is not in a valid range, a zero value will be returned.
     /// For regression models, the label index is ignored.
-    fn label_bias(&self, label_index: i32) -> f64;
+    ///
+    /// Will return an error if called on one-class SMV models.
+    fn label_bias(&self, label_index: i32) -> Result<f64, ModelError>;
+
+    /// Returns the bias term used in one-class SVMs.
+    ///
+    /// Will return an error if called on one-class SMV models.
+    fn rho(&self) -> Result<f64, ModelError>;
 
     /// Returns the bias of the input data with which the model was trained.
     fn bias(&self) -> f64;
@@ -69,7 +76,7 @@ pub trait LibLinearModel: HasLibLinearProblem + HasLibLinearParameter {
 
     /// Returns the number of classes of the model.
     ///
-    /// For regression models, 2 is returned.
+    /// For regression models, `2` is returned.
     fn num_classes(&self) -> usize;
 
     /// Returns the number of features of the input data with which the model was trained.
@@ -85,7 +92,7 @@ pub trait LibLinearModel: HasLibLinearProblem + HasLibLinearParameter {
 pub trait LibLinearCrossValidator: HasLibLinearProblem + HasLibLinearParameter {
     /// Performs k-folds cross-validation and returns the predicted labels.
     ///
-    /// Number of folds must be >= 2.
+    /// Number of folds must be `>= 2`.
     fn cross_validation(&self, folds: i32) -> Result<Vec<f64>, ModelError>;
 
     /// Performs k-folds cross-validation to find the best cost value (parameter _C_) and regression
@@ -99,7 +106,7 @@ pub trait LibLinearCrossValidator: HasLibLinearProblem + HasLibLinearParameter {
     /// * L2R_LR, L2R_L2LOSS_SVC - Cross validation is conducted many times with values of `_C_
     /// = n * start_C; n = 1, 2, 4, 8...` to find the value with the highest cross validation
     /// accuracy. The procedure stops when the models of all folds become stable or when the cost
-    /// reaches the upper-bound `max_cost = 1024`. If `start_cost` is <= 0, an appropriately small value is
+    /// reaches the upper-bound `max_cost = 1024`. If `start_cost <= 0`, an appropriately small value is
     /// automatically calculated and used instead.
     ///
     ///
@@ -108,11 +115,11 @@ pub trait LibLinearCrossValidator: HasLibLinearProblem + HasLibLinearParameter {
     /// of _p_, the inner loop performs cross validation with values of `_C_ = n * start_C; n = 1, 2,
     /// 4, 8...` to find the value with the lowest mean squared error. The procedure stops when the
     /// models of all folds become stable or when the cost reaches the upper-bound `max_cost = 1048576`. If
-    /// `start_cost` is <= 0, an appropriately small value is automatically calculated and used instead.
+    /// `start_cost <= 0`, an appropriately small value is automatically calculated and used instead.
     ///
     ///   `max_p` is automatically calculated from the problem's training data.
-    /// If `start_loss_sensitivity` is <= 0, it is set to `max_loss_sensitivity`. Otherwise, the outer
-    /// loop starts with the first `_p_ = n / (20 * max_p)` that is <= `start_loss_sensitivity`.
+    /// If `start_loss_sensitivity <= 0`, it is set to `max_loss_sensitivity`. Otherwise, the outer
+    /// loop starts with the first `_p_ = n / (20 * max_p)` that is `<= start_loss_sensitivity`.
     fn find_optimal_constraints_violation_cost_and_loss_sensitivity(
         &self,
         folds: i32,
@@ -121,7 +128,6 @@ pub trait LibLinearCrossValidator: HasLibLinearProblem + HasLibLinearParameter {
     ) -> Result<(f64, f64, f64), ModelError>;
 }
 
-#[doc(hidden)]
 pub(crate) struct Model {
     problem: Option<Problem>,
     parameter: Parameter,
@@ -178,14 +184,18 @@ impl Model {
                 backing_store_labels.push(*(*bound).label.offset(i as isize));
             }
 
+            let mut parameter_builder = ParameterBuilder::default();
+            parameter_builder.solver_type(std::mem::transmute((*bound).param.solver_type as i8));
+
+            let parameter = parameter_builder
+                .build()
+                .map_err(|e| ModelError::SerializationError(e.to_string()))?;
+
             Ok(Self {
                 problem: None,
                 // solver_type is the only parameter that's serialized to disk
                 // init the parameter object with just that and pass the defaults for the rest
-                parameter: ParameterBuilder::new()
-                    .solver_type(std::mem::transmute((*bound).param.solver_type as i8))
-                    .build()
-                    .map_err(|e| ModelError::SerializationError(e.to_string()))?,
+                parameter,
                 backing_store_labels,
                 bound,
             })
@@ -305,8 +315,24 @@ impl LibLinearModel for Model {
         unsafe { ffi::get_decfun_coef(self.bound, feature_index, label_index) }
     }
 
-    fn label_bias(&self, label_index: i32) -> f64 {
-        unsafe { ffi::get_decfun_bias(self.bound, label_index) }
+    fn label_bias(&self, label_index: i32) -> Result<f64, ModelError> {
+        if self.parameter().solver_type().is_one_class() {
+            return Err(ModelError::InvalidState(
+                "Label bias value unavailable for one-class models".to_owned(),
+            ));
+        }
+
+        unsafe { Ok(ffi::get_decfun_bias(self.bound, label_index)) }
+    }
+
+    fn rho(&self) -> Result<f64, ModelError> {
+        if !self.parameter().solver_type().is_one_class() {
+            return Err(ModelError::InvalidState(
+                "Rho value unavailable for non-one-class models".to_owned(),
+            ));
+        }
+
+        unsafe { Ok(ffi::get_decfun_rho(self.bound)) }
     }
 
     fn bias(&self) -> f64 {

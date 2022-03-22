@@ -1,16 +1,17 @@
-#[macro_use]
-extern crate approx;
-extern crate liblinear;
-extern crate parsnip;
-
-use parsnip::*;
-
-use liblinear::*;
+use approx::abs_diff_eq;
+use liblinear::parameter::LibLinearParameter;
+use liblinear::{
+    model::{LibLinearCrossValidator, LibLinearModel},
+    parameter::{HasLibLinearParameter, SolverType},
+    util::{PredictionInput, TrainingInput},
+    Builder, Serializer,
+};
+use parsnip::categorical_accuracy;
 
 fn create_default_model_builder() -> Builder {
-    let libsvm_data = util::TrainingInput::from_libsvm_file("tests/data/heart_scale").unwrap();
+    let libsvm_data = TrainingInput::from_libsvm_file("tests/data/heart_scale").unwrap();
 
-    let mut model_builder = liblinear::Builder::new();
+    let mut model_builder = Builder::default();
     model_builder.problem().input_data(libsvm_data);
     model_builder.parameters().solver_type(SolverType::L1R_LR);
     model_builder
@@ -18,12 +19,12 @@ fn create_default_model_builder() -> Builder {
 
 #[test]
 fn test_version() {
-    assert_eq!(liblinear_version(), 230);
+    assert_eq!(liblinear::liblinear_version(), 244);
 }
 
 #[test]
 fn test_training_input_libsvm_data() {
-    let libsvm_data = util::TrainingInput::from_libsvm_file("tests/data/heart_scale").unwrap();
+    let libsvm_data = TrainingInput::from_libsvm_file("tests/data/heart_scale").unwrap();
     assert_eq!(libsvm_data.len_data(), 270);
     assert_eq!(libsvm_data.len_features(), 13);
 
@@ -35,7 +36,7 @@ fn test_training_input_libsvm_data() {
         assert_eq!(instance_218.features().get(4).unwrap().1, -0.538813f64);
     }
 
-    let mut model_builder = liblinear::Builder::new();
+    let mut model_builder = liblinear::Builder::default();
     model_builder.problem().input_data(libsvm_data).bias(0f64);
     model_builder.parameters().solver_type(SolverType::L1R_LR);
 
@@ -47,11 +48,11 @@ fn test_training_input_libsvm_data() {
 
     let class = model
         .predict(
-            util::PredictionInput::from_dense_features(vec![
+            PredictionInput::from_dense_features(vec![
                 -0.5, -1.0, 0.333333, -0.660377, -0.351598, -1.0, 1.0, 0.541985, 1.0, -1.0, -1.0,
                 -1.0, -1.0,
             ])
-	            .unwrap(),
+            .unwrap(),
         )
         .unwrap();
     assert_eq!(class, -1f64);
@@ -66,10 +67,10 @@ fn test_model_sparse_data() {
     ];
     let y = vec![0.0, 1.0, 0.0];
 
-    let mut model_builder = liblinear::Builder::new();
+    let mut model_builder = liblinear::Builder::default();
     model_builder
         .problem()
-        .input_data(util::TrainingInput::from_sparse_features(y, x).unwrap())
+        .input_data(TrainingInput::from_sparse_features(y, x).unwrap())
         .bias(0f64);
     model_builder
         .parameters()
@@ -85,7 +86,7 @@ fn test_model_sparse_data() {
     assert_eq!(model.num_classes(), 2);
 
     let class = model
-        .predict(util::PredictionInput::from_sparse_features(vec![(3u32, 9.9f64)]).unwrap())
+        .predict(PredictionInput::from_sparse_features(vec![(3u32, 9.9f64)]).unwrap())
         .unwrap();
     assert_eq!(class, 1f64);
 }
@@ -99,10 +100,10 @@ fn test_model_dense_data() {
     ];
     let y = vec![0.0, 1.0, 3.0];
 
-    let mut model_builder = liblinear::Builder::new();
+    let mut model_builder = liblinear::Builder::default();
     model_builder
         .problem()
-        .input_data(util::TrainingInput::from_dense_features(y, x).unwrap())
+        .input_data(TrainingInput::from_dense_features(y, x).unwrap())
         .bias(0f64);
     model_builder.parameters().solver_type(SolverType::MCSVM_CS);
 
@@ -113,7 +114,7 @@ fn test_model_dense_data() {
     assert_eq!(model.num_classes(), 3);
 
     let class = model
-        .predict(util::PredictionInput::from_dense_features(vec![1.2, 1.0, 9.0]).unwrap())
+        .predict(PredictionInput::from_dense_features(vec![1.2, 1.0, 9.0]).unwrap())
         .unwrap();
     assert_eq!(class, 3f64);
 }
@@ -144,7 +145,7 @@ fn test_model_save_load() {
 
 #[test]
 fn test_cross_validator() {
-    toggle_liblinear_stdout_output(false);
+    liblinear::toggle_liblinear_stdout_output(false);
 
     let mut model_builder = create_default_model_builder();
     model_builder.parameters().solver_type(SolverType::L2R_LR);
@@ -169,9 +170,9 @@ fn test_cross_validator() {
         -1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0,
         1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, 1.0,
     ]
-	    .iter()
-	    .map(|e| *e as i32)
-	    .collect::<Vec<i32>>();
+    .iter()
+    .map(|e| *e as i32)
+    .collect::<Vec<i32>>();
     let predicted = cross_validator
         .cross_validation(4)
         .unwrap()
@@ -180,7 +181,7 @@ fn test_cross_validator() {
         .collect::<Vec<i32>>();
 
     // RHS was taken from the output of liblinear's bundled trainer program
-    abs_diff_eq!(
+    let _ = abs_diff_eq!(
         categorical_accuracy(&predicted, &ground_truth).unwrap(),
         0.8148148
     );
@@ -188,7 +189,7 @@ fn test_cross_validator() {
     let (best_c, acc, best_p) = cross_validator
         .find_optimal_constraints_violation_cost_and_loss_sensitivity(4, 0.0, 0.0)
         .unwrap();
-    abs_diff_eq!(best_c, 0.00390625);
-    abs_diff_eq!(acc, 0.8407407);
+    let _ = abs_diff_eq!(best_c, 0.00390625);
+    let _ = abs_diff_eq!(acc, 0.8407407);
     assert_eq!(best_p, -1f64);
 }

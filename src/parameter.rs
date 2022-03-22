@@ -13,6 +13,7 @@ use crate::{errors::ParameterError, ffi};
 /// * Regular L2-loss for SVM (hinge-loss)
 /// * Logistic loss for logistic regression
 #[allow(non_camel_case_types)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SolverType {
     /// L2-regularized logistic regression (primal).
     L2R_LR = 0,
@@ -46,12 +47,15 @@ pub enum SolverType {
 
     /// L2-regularized L1-loss support vector regression (dual).
     L2R_L1LOSS_SVR_DUAL = 13,
+
+    /// One-class support vector machine (dual).
+    ONECLASS_SVM = 21,
 }
 
 impl SolverType {
     /// Returns true if the solver is a probabilistic/logistic regression solver.
     ///
-    /// Supported solvers: L2R_LR, L1R_LR, L2R_LR_DUAL.
+    /// Supported solvers: `L2R_LR`, `L1R_LR`, `L2R_LR_DUAL`.
     pub fn is_logistic_regression(&self) -> bool {
         match self {
             SolverType::L2R_LR | SolverType::L1R_LR | SolverType::L2R_LR_DUAL => true,
@@ -61,7 +65,7 @@ impl SolverType {
 
     /// Returns true if the solver is a support vector regression solver.
     ///
-    /// Supported solvers: L2R_L2LOSS_SVR, L2R_L2LOSS_SVR_DUAL, L2R_L1LOSS_SVR_DUAL.
+    /// Supported solvers: `L2R_L2LOSS_SVR`, `L2R_L2LOSS_SVR_DUAL`, `L2R_L1LOSS_SVR_DUAL`.
     pub fn is_support_vector_regression(&self) -> bool {
         match self {
             SolverType::L2R_L2LOSS_SVR
@@ -77,10 +81,15 @@ impl SolverType {
     pub fn is_multi_class_classification(&self) -> bool {
         !self.is_support_vector_regression()
     }
+
+    /// Returns true if the solver is a one-class solver.
+    pub fn is_one_class(&self) -> bool {
+        *self == SolverType::ONECLASS_SVM
+    }
 }
 
 impl Default for SolverType {
-    /// Default: L2R_LR
+    /// Default: `L2R_LR`
     fn default() -> Self {
         SolverType::L2R_LR
     }
@@ -94,17 +103,24 @@ pub trait LibLinearParameter: Clone {
     /// Tolerance of termination criterion for optimization (parameter _e_).
     fn stopping_criterion(&self) -> f64;
 
-    /// Cost of constraints violation (parameter _C_).
+    /// Cost of constraints violation (parameter _c_).
     ///
     /// Rules the trade-off between regularization and correct classification on data.
     /// It can be seen as the inverse of a regularization constant.
     fn constraints_violation_cost(&self) -> f64;
 
+    /// Approximates the fraction of data as outliers (parameter _n_).
+    ///
+    /// Only applicable to the one-class SVM solver.
+    fn one_class_svm_nu(&self) -> f64;
+
     /// Sensitivity of loss of support vector regression (parameter _p_).
     fn regression_loss_sensitivity(&self) -> f64;
+
+    /// Regularize bias during training (parameter _r_).
+    fn regularize_bias(&self) -> bool;
 }
 
-#[doc(hidden)]
 pub(crate) struct Parameter {
     backing_store_class_cost_penalty_weights: Vec<f64>,
     backing_store_class_cost_penalty_labels: Vec<i32>,
@@ -118,9 +134,11 @@ impl Parameter {
         eps: f64,
         cost: f64,
         p: f64,
+        nu: f64,
         cost_penalty_weights: Vec<f64>,
         cost_penalty_labels: Vec<i32>,
         init_solutions: Vec<f64>,
+        regularize_bias: bool,
     ) -> Result<Self, ParameterError> {
         if cost_penalty_weights.len() != cost_penalty_labels.len() {
             return Err(ParameterError::InvalidParameters(
@@ -147,11 +165,13 @@ impl Parameter {
                     cost_penalty_weights.as_ptr()
                 },
                 p,
+                nu,
                 init_sol: if init_solutions.is_empty() {
                     std::ptr::null()
                 } else {
                     init_solutions.as_ptr()
                 },
+                regularize_bias: if regularize_bias { 1 } else { 0 },
             },
             backing_store_class_cost_penalty_weights: cost_penalty_weights,
             backing_store_class_cost_penalty_labels: cost_penalty_labels,
@@ -191,6 +211,18 @@ impl LibLinearParameter for Parameter {
     fn regression_loss_sensitivity(&self) -> f64 {
         self.bound.p
     }
+
+    fn regularize_bias(&self) -> bool {
+        if self.bound.regularize_bias == 1 {
+            true
+        } else {
+            false
+        }
+    }
+
+    fn one_class_svm_nu(&self) -> f64 {
+        self.bound.nu
+    }
 }
 
 impl Clone for Parameter {
@@ -208,7 +240,9 @@ impl Clone for Parameter {
                 weight_label: weight_labels.as_ptr(),
                 weight: weights.as_ptr(),
                 p: self.bound.p,
+                nu: self.bound.nu,
                 init_sol: init_sol.as_ptr(),
+                regularize_bias: self.bound.regularize_bias,
             },
             backing_store_class_cost_penalty_weights: weights,
             backing_store_class_cost_penalty_labels: weight_labels,
@@ -218,32 +252,39 @@ impl Clone for Parameter {
 }
 
 /// Builder for [LibLinearParameter](enum.LibLinearParameter.html).
+#[derive(Clone, Debug)]
 pub struct ParameterBuilder {
     solver_type: SolverType,
     epsilon: f64,
     cost: f64,
     p: f64,
+    nu: f64,
     cost_penalty_weights: Vec<f64>,
     cost_penalty_labels: Vec<i32>,
     init_solutions: Vec<f64>,
+    regularize_bias: bool,
 }
 
-impl ParameterBuilder {
-    pub fn new() -> Self {
+impl Default for ParameterBuilder {
+    fn default() -> Self {
         Self {
             solver_type: SolverType::default(),
             epsilon: 0.01,
             cost: 1.0,
             p: 0.1,
+            nu: 0.5,
             cost_penalty_weights: Vec::new(),
             cost_penalty_labels: Vec::new(),
             init_solutions: Vec::new(),
+            regularize_bias: true,
         }
     }
+}
 
+impl ParameterBuilder {
     /// Set solver type.
     ///
-    /// Default: [L2R_LR](enum.SolverType.html#variant.L2R_LR)
+    /// Default: `[L2R_LR](enum.SolverType.html#variant.L2R_LR)`
     pub fn solver_type(&mut self, solver_type: SolverType) -> &mut Self {
         self.solver_type = solver_type;
         self
@@ -251,7 +292,7 @@ impl ParameterBuilder {
 
     /// Set tolerance of termination criterion.
     ///
-    /// Default: 0.01
+    /// Default: `0.01`
     pub fn stopping_criterion(&mut self, epsilon: f64) -> &mut Self {
         self.epsilon = epsilon;
         self
@@ -259,7 +300,7 @@ impl ParameterBuilder {
 
     /// Set cost of constraints violation.
     ///
-    /// Default: 1.0
+    /// Default: `1.0`
     pub fn constraints_violation_cost(&mut self, cost: f64) -> &mut Self {
         self.cost = cost;
         self
@@ -267,7 +308,7 @@ impl ParameterBuilder {
 
     /// Set tolerance margin in regression loss function of SVR. Not used for classification problems.
     ///
-    /// Default: 0.1
+    /// Default: `0.1
     pub fn regression_loss_sensitivity(&mut self, p: f64) -> &mut Self {
         self.p = p;
         self
@@ -295,15 +336,37 @@ impl ParameterBuilder {
         self
     }
 
-    pub fn build(self) -> Result<Parameter, ParameterError> {
+    /// Regularize bias during training.
+    ///
+    /// If set to `false`, the bias value must be set to `1`.
+    ///
+    /// Default: `true`
+    pub fn regularize_bias(&mut self, regularize: bool) -> &mut Self {
+        self.regularize_bias = regularize;
+        self
+    }
+
+    /// Approximates the fraction of data as outliers.
+    ///
+    /// Only applicable to the one-class SVM solver.
+    ///
+    /// Default: `0.5`
+    pub fn one_class_svm_nu(&mut self, nu: f64) -> &mut Self {
+        self.nu = nu;
+        self
+    }
+
+    pub(crate) fn build(self) -> Result<Parameter, ParameterError> {
         Parameter::new(
             self.solver_type,
             self.epsilon,
             self.cost,
             self.p,
+            self.nu,
             self.cost_penalty_weights,
             self.cost_penalty_labels,
             self.init_solutions,
+            self.regularize_bias,
         )
     }
 }

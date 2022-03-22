@@ -33,7 +33,9 @@ pub(crate) struct Parameter {
     pub weight_label: *const i32,
     pub weight: *const f64,
     pub p: f64,
+    pub nu: f64,
     pub init_sol: *const f64,
+    pub regularize_bias: i32,
 }
 
 #[repr(C)]
@@ -44,6 +46,7 @@ pub(crate) struct Model {
     pub w: *mut f64,
     pub label: *mut i32,
     pub bias: f64,
+    pub rho: f64,
 }
 
 #[allow(dead_code)]
@@ -89,6 +92,7 @@ extern "C" {
     pub(crate) fn get_labels(model_: *const Model, label: *mut i32);
     pub(crate) fn get_decfun_coef(model_: *const Model, feat_idx: i32, label_idx: i32) -> f64;
     pub(crate) fn get_decfun_bias(model_: *const Model, label_idx: i32) -> f64;
+    pub(crate) fn get_decfun_rho(model_: *const Model) -> f64;
 
     pub(crate) fn free_model_content(model_: *mut Model);
     pub(crate) fn free_and_destroy_model(model_: *mut *mut Model);
@@ -97,6 +101,7 @@ extern "C" {
     pub(crate) fn check_parameter(prob: *const Problem, param: *const Parameter) -> *const c_char;
     pub(crate) fn check_probability_model(model_: *const Model) -> i32;
     pub(crate) fn check_regression_model(model_: *const Model) -> i32;
+    pub(crate) fn check_oneclass_model(model_: *const Model) -> i32;
 
     pub(crate) fn set_print_string_function(func: Option<extern "C" fn(*const c_char)>);
 }

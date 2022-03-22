@@ -19,20 +19,22 @@ use parameter::ParameterBuilder;
 use problem::ProblemBuilder;
 
 /// Primary model builder. Functions as the entry point into the API.
+#[derive(Clone)]
 pub struct Builder {
     problem_builder: ProblemBuilder,
     parameter_builder: ParameterBuilder,
 }
 
-impl Builder {
+impl Default for Builder {
     /// Creates a new instance of the builder.
-    pub fn new() -> Builder {
-        Builder {
-            problem_builder: ProblemBuilder::new(),
-            parameter_builder: ParameterBuilder::new(),
+    fn default() -> Self {
+        Self {
+            ..Default::default()
         }
     }
+}
 
+impl Builder {
     /// Builder for the model's linear problem.
     pub fn problem(&mut self) -> &mut ProblemBuilder {
         &mut self.problem_builder

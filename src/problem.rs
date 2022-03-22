@@ -15,7 +15,6 @@ pub trait LibLinearProblem: Clone {
     fn bias(&self) -> f64;
 }
 
-#[doc(hidden)]
 pub(crate) struct Problem {
     backing_store_labels: Vec<f64>,
     backing_store_features: Vec<Vec<FeatureNode>>,
@@ -130,34 +129,38 @@ impl Clone for Problem {
 }
 
 /// Builder for [LibLinearProblem](enum.LibLinearProblem.html).
+#[derive(Clone, Debug)]
 pub struct ProblemBuilder {
     input_data: Option<TrainingInput>,
     bias: f64,
 }
 
-impl ProblemBuilder {
-    pub fn new() -> Self {
+impl Default for ProblemBuilder {
+    fn default() -> Self {
         Self {
             input_data: None,
             bias: -1.0,
         }
     }
+}
 
+impl ProblemBuilder {
     /// Set input/training data.
     pub fn input_data(&mut self, input_data: TrainingInput) -> &mut Self {
         self.input_data = Some(input_data);
         self
     }
 
-    /// Set bias. If bias is >= 0, it's appended to the feature vector for every instance.
+    /// Set bias. If `bias >= 0`, it's appended to the feature vector for every instance.
+    /// Must be set to `1.0` for one-class SVM solvers.
     ///
-    /// Default: -1.0
+    /// Default: `-1.0`
     pub fn bias(&mut self, bias: f64) -> &mut Self {
         self.bias = bias;
         self
     }
 
-    pub fn build(self) -> Result<Problem, ProblemError> {
+    pub(crate) fn build(self) -> Result<Problem, ProblemError> {
         let input_data = self.input_data.ok_or(ProblemError::InvalidTrainingData(
             "Missing input/training data".to_owned(),
         ))?;

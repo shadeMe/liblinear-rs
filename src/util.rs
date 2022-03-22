@@ -10,7 +10,7 @@ use crate::errors::PredictionInputError;
 use crate::errors::TrainingInputError;
 
 /// A tuple of a (sparse) vector of features and their corresponding gold-standard label/target value.
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct TrainingInstance {
     features: Vec<(u32, f64)>,
     label: f64,
@@ -117,7 +117,7 @@ impl FromStr for TrainingInstance {
 }
 
 /// Input data for [LibLinearModel](trait.LibLinearModel.html) and [LibLinearCrossValidator](trait.LibLinearCrossValidator.html).
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct TrainingInput {
     instances: Vec<TrainingInstance>,
     last_feature_index: u32,
@@ -155,7 +155,7 @@ impl TrainingInput {
     ///
     /// `<target_value> <feature_index>:<feature_value> <feature_index>:<feature_value>...`
     ///
-    /// Feature indices start from 1 and increase monotonically. However, they do not need to be continuous.
+    /// Feature indices start from `1` and increase monotonically. However, they do not need to be continuous.
     pub fn from_libsvm_file(path: &str) -> Result<TrainingInput, TrainingInputError> {
         let mut out = TrainingInput::default();
         let reader = BufReader::new(
