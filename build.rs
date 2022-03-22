@@ -3,7 +3,7 @@ extern crate cc;
 fn main() {
     cc::Build::new()
         .cpp(true)
-        .flag("-O3")
+        .flag("-O2")
         .file("liblinear/linear.cpp")
         .file("liblinear/tron.cpp")
         .file("liblinear/blas/daxpy.c")
