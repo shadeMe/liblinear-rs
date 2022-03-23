@@ -101,7 +101,7 @@ pub trait LibLinearParameter: Clone {
     fn solver_type(&self) -> SolverType;
 
     /// Tolerance of termination criterion for optimization (parameter _e_).
-    fn stopping_criterion(&self) -> f64;
+    fn stopping_tolerance(&self) -> f64;
 
     /// Cost of constraints violation (parameter _c_).
     ///
@@ -109,10 +109,10 @@ pub trait LibLinearParameter: Clone {
     /// It can be seen as the inverse of a regularization constant.
     fn constraints_violation_cost(&self) -> f64;
 
-    /// Approximates the fraction of data as outliers (parameter _n_).
+    /// Fraction of data that is to be classified as outliers (parameter _n_).
     ///
     /// Only applicable to the one-class SVM solver.
-    fn one_class_svm_nu(&self) -> f64;
+    fn outlier_ratio(&self) -> f64;
 
     /// Sensitivity of loss of support vector regression (parameter _p_).
     fn regression_loss_sensitivity(&self) -> f64;
@@ -200,7 +200,7 @@ impl LibLinearParameter for Parameter {
         unsafe { std::mem::transmute(self.bound.solver_type as i8) }
     }
 
-    fn stopping_criterion(&self) -> f64 {
+    fn stopping_tolerance(&self) -> f64 {
         self.bound.eps
     }
 
@@ -220,7 +220,7 @@ impl LibLinearParameter for Parameter {
         }
     }
 
-    fn one_class_svm_nu(&self) -> f64 {
+    fn outlier_ratio(&self) -> f64 {
         self.bound.nu
     }
 }
@@ -293,7 +293,7 @@ impl ParameterBuilder {
     /// Set tolerance of termination criterion.
     ///
     /// Default: `0.01`
-    pub fn stopping_criterion(&mut self, epsilon: f64) -> &mut Self {
+    pub fn stopping_tolerance(&mut self, epsilon: f64) -> &mut Self {
         self.epsilon = epsilon;
         self
     }
@@ -346,12 +346,12 @@ impl ParameterBuilder {
         self
     }
 
-    /// Approximates the fraction of data as outliers.
+    /// Fraction of data that is to be classified as outliers.
     ///
     /// Only applicable to the one-class SVM solver.
     ///
     /// Default: `0.5`
-    pub fn one_class_svm_nu(&mut self, nu: f64) -> &mut Self {
+    pub fn outlier_ratio(&mut self, nu: f64) -> &mut Self {
         self.nu = nu;
         self
     }

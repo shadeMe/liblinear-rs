@@ -31,7 +31,7 @@ model_builder
 model_builder
     .parameters()
     .solver_type(SolverType::L2R_LR)
-    .stopping_criterion(0.1f64)
+    .stopping_tolerance(0.1f64)
     .constraints_violation_cost(0.1f64)
     .regression_loss_sensitivity(1f64);
 

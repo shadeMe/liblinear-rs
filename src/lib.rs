@@ -29,7 +29,8 @@ impl Default for Builder {
     /// Creates a new instance of the builder.
     fn default() -> Self {
         Self {
-            ..Default::default()
+            problem_builder: Default::default(),
+            parameter_builder: Default::default(),
         }
     }
 }

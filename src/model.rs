@@ -52,7 +52,7 @@ pub trait LibLinearModel: HasLibLinearProblem + HasLibLinearParameter {
     /// If the feature index is not in the valid range, a zero value will be returned.
     ///
     /// For classification models, if the label index is not in the valid range, a zero value will be returned.
-    /// For regression models, the label index is ignored.
+    /// For regression and one-class models, the label index is ignored.
     fn feature_coefficient(&self, feature_index: i32, label_index: i32) -> f64;
 
     /// Returns the bias term corresponding to the class with the given index.
@@ -65,7 +65,7 @@ pub trait LibLinearModel: HasLibLinearProblem + HasLibLinearParameter {
 
     /// Returns the bias term used in one-class SVMs.
     ///
-    /// Will return an error if called on one-class SMV models.
+    /// Will return an error if called on non-one-class models.
     fn rho(&self) -> Result<f64, ModelError>;
 
     /// Returns the bias of the input data with which the model was trained.
