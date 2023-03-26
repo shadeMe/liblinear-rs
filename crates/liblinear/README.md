@@ -3,15 +3,15 @@
 [![docs]][docs.rs]
 ![MIT]
 
-# liblinear-rs
+# liblinear
+
 Rust bindings for the [liblinear](https://github.com/cjlin1/liblinear) C/C++ library.
 Provides a thin (but rustic) wrapper around the original C-interface exposed by the library.
 
-
 # Usage
+
 Use the `liblinear::Builder` API to train a model on sparse features and
 predict the class of a new instance.
-
 
 ```rust
 use liblinear::*;
@@ -46,16 +46,17 @@ println!(predicted_class);
 
 More examples can be found in the bundled unit tests.
 
-
 # Changelog
+
 1.0.0 - Update liblinear to v230 (breaking changes), minor changes and fixes.
+
 0.1.1 - Added readme, minor documentation fixes.
+
 0.1.0 - Initial release.
 
-
-[Latest Version]: https://img.shields.io/crates/v/liblinear.svg
+[latest version]: https://img.shields.io/crates/v/liblinear.svg
 [crates.io]: https://crates.io/crates/liblinear
-[MIT]: https://img.shields.io/badge/license-MIT-blue.svg
+[mit]: https://img.shields.io/badge/license-MIT-blue.svg
 [docs]: https://docs.rs/liblinear/badge.svg
 [docs.rs]: https://docs.rs/crate/liblinear/
 [deps]: https://deps.rs/repo/github/shademe/liblinear-rs

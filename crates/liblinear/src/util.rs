@@ -1,5 +1,4 @@
-//! Utility structs and functions for reading/generating training
-//! and prediction data.
+//! Utility structs and functions for reading/generating training and prediction data.
 
 use std::fs::File;
 use std::io::BufRead;
@@ -38,16 +37,12 @@ impl FromStr for TrainingInstance {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         // assumes that the string is a valid line in the libSVM data format
         let mut last_feature_index = 0u32;
-        let splits: Vec<&str> = s.split(" ").collect();
+        let splits: Vec<&str> = s.split(' ').collect();
         match splits.len() {
-            0 => {
-                return Err(TrainingInputError::ParseError("Empty line".to_owned()));
-            }
-            1 => {
-                return Err(TrainingInputError::ParseError(
-                    "No features found".to_owned(),
-                ));
-            }
+            0 => Err(TrainingInputError::ParseError("Empty line".to_owned())),
+            1 => Err(TrainingInputError::ParseError(
+                "No features found".to_owned(),
+            )),
             _ => {
                 let mut label = 0f64;
                 let mut features: Vec<(u32, f64)> = Vec::default();
@@ -67,7 +62,7 @@ impl FromStr for TrainingInstance {
                             })?
                         }
                         _ => {
-                            let pair: Vec<&str> = token.split(":").collect();
+                            let pair: Vec<&str> = token.split(':').collect();
                             if pair.len() != 2 {
                                 return Err(TrainingInputError::ParseError(format!(
                                     "Couldn't feature pair '{}'",
@@ -116,7 +111,7 @@ impl FromStr for TrainingInstance {
     }
 }
 
-/// Input data for [LibLinearModel](trait.LibLinearModel.html) and [LibLinearCrossValidator](trait.LibLinearCrossValidator.html).
+/// Training data for [`Model`](crate::model::Model).
 #[derive(Default, Clone, Debug)]
 pub struct TrainingInput {
     instances: Vec<TrainingInstance>,
@@ -124,24 +119,24 @@ pub struct TrainingInput {
 }
 
 impl TrainingInput {
-    #[doc(hidden)]
-    pub fn last_feature_index(&self) -> u32 {
-        self.last_feature_index
-    }
-
-    #[doc(hidden)]
-    pub fn yield_data(self) -> Vec<TrainingInstance> {
-        self.instances
+    /// Constituent training instances.
+    pub fn instances(&self) -> &Vec<TrainingInstance> {
+        &self.instances
     }
 
     /// Number of training instances.
-    pub fn len_data(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.instances.len()
     }
 
+    /// Returns `true` if there are no training instances.
+    pub fn is_empty(&self) -> bool {
+        self.instances.is_empty()
+    }
+
     /// Dimensionality of the feature vector.
-    pub fn len_features(&self) -> usize {
-        self.last_feature_index as usize
+    pub fn dim(&self) -> u32 {
+        self.last_feature_index
     }
 
     /// Returns a reference to the training instance at the given index.
@@ -184,7 +179,7 @@ impl TrainingInput {
             return Err(TrainingInputError::DataError(
                 "Mismatch between number of training instances and output labels".to_owned(),
             ));
-        } else if labels.len() == 0 || features.len() == 0 {
+        } else if labels.is_empty() || features.is_empty() {
             return Err(TrainingInputError::DataError(
                 "No input/output data".to_owned(),
             ));
@@ -224,7 +219,7 @@ impl TrainingInput {
             return Err(TrainingInputError::DataError(
                 "Mismatch between number of training instances and output labels".to_owned(),
             ));
-        } else if labels.len() == 0 || features.len() == 0 {
+        } else if labels.is_empty() || features.is_empty() {
             return Err(TrainingInputError::DataError(
                 "No input/output data".to_owned(),
             ));
@@ -251,7 +246,7 @@ impl TrainingInput {
     }
 }
 
-/// Test data for [LibLinearModel](trait.LibLinearModel.html).
+/// Prediction data for [`Model`](crate::model::Model).
 #[derive(Default, Clone)]
 pub struct PredictionInput {
     features: Vec<(u32, f64)>,
@@ -259,18 +254,13 @@ pub struct PredictionInput {
 }
 
 impl PredictionInput {
-    /// A list of tuples that encode a feature index and its corresponding feature value.
+    /// The features as a list of index and value tuples.
     pub fn features(&self) -> &Vec<(u32, f64)> {
         &self.features
     }
 
-    #[doc(hidden)]
-    pub fn yield_data(self) -> Vec<(u32, f64)> {
-        self.features
-    }
-
-    #[doc(hidden)]
-    pub fn last_feature_index(&self) -> u32 {
+    /// Dimensionality of the feature vector.
+    pub fn dim(&self) -> u32 {
         self.last_feature_index
     }
 
@@ -300,7 +290,7 @@ impl PredictionInput {
     pub fn from_sparse_features(
         features: Vec<(u32, f64)>,
     ) -> Result<PredictionInput, PredictionInputError> {
-        if features.len() == 0 {
+        if features.is_empty() {
             return Err(PredictionInputError::DataError("No input data".to_owned()));
         }
 

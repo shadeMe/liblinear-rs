@@ -29,30 +29,18 @@ pub enum PredictionInputError {
     DataError(String),
 }
 
-/// Errors related to a model's parameters.
-#[derive(Debug, Error)]
-pub enum ParameterError {
-    /// One or more of the model's parameters are either incomplete or invalid.
-    #[error("parameter error: {0}")]
-    InvalidParameters(String),
-}
-
-/// Errors related to a model's input/training data.
-#[derive(Debug, Error)]
-pub enum ProblemError {
-    /// The model's input/training data is either incomplete or invalid.
-    #[error("input data error: {0}")]
-    InvalidTrainingData(String),
-}
-
 /// Errors raised by a model's API call.
 #[derive(Debug, Error)]
 pub enum ModelError {
-    /// The model's internal state is invalid.
+    /// One or more of the model's parameters are either incomplete or invalid.
+    #[error("parameter error: {0}")]
+    InvalidParameters(String),
+
+    /// The model cannot be cast to another type.
     ///
-    /// This can occur if the model's parameters or input data were not initialized correctly.
-    #[error("invalid state: {0}")]
-    InvalidState(String),
+    /// This can occur if the source and target solver types are not the same.
+    #[error("invalid conversion: {0}")]
+    InvalidConversion(String),
 
     /// The model cannot be saved to/loaded from disk.
     ///
@@ -68,8 +56,4 @@ pub enum ModelError {
     /// One or more of the arguments passed to the API call are invalid.
     #[error("illegal argument: {0}")]
     IllegalArgument(String),
-
-    /// The model encountered an unexpected internal error.
-    #[error("unknown error: {0}")]
-    UnknownError(String),
 }

@@ -1,11 +1,11 @@
-//! FFI bindings for liblinear
+//! FFI bindings for liblinear.
 
 use std::os::raw::c_char;
 
 #[derive(Copy, Clone)]
 #[repr(C)]
 /// Represents a single feature in a sparse feature vector.
-pub struct FeatureNode {
+pub(crate) struct FeatureNode {
     /// One-based index of the feature in the feature vector.
     pub index: i32,
 
@@ -82,7 +82,7 @@ extern "C" {
         model_: *const Model,
         x: *const FeatureNode,
         prob_estimates: *mut f64,
-    );
+    ) -> f64;
 
     pub(crate) fn save_model(model_file_name: *const c_char, model_: *const Model) -> i32;
     pub(crate) fn load_model(model_file_name: *const c_char) -> *mut Model;
