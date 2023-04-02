@@ -195,13 +195,7 @@ fn test_cross_validator() {
         .iter()
         .map(|e| *e as i32)
         .collect::<Vec<i32>>();
-
-    // RHS was taken from the output of liblinear's bundled trainer program
-    assert_abs_diff_eq!(
-        categorical_accuracy(&predicted, &ground_truth).unwrap(),
-        0.8148148
-    );
-
+    let pred_acc = categorical_accuracy(&predicted, &ground_truth).unwrap();
     let (best_c, acc, best_p) =
         Model::find_optimal_constraints_violation_cost_and_loss_sensitivity(
             &libsvm_data,
@@ -211,9 +205,13 @@ fn test_cross_validator() {
             -1.0,
         )
         .expect("couldn't perform parameter search");
+    // dbg!(pred_acc);
     // dbg!(best_c);
     // dbg!(acc);
     // dbg!(best_p);
+
+    // RHS was taken from the output of liblinear's bundled trainer program
+    assert_abs_diff_eq!(pred_acc, 0.8148148);
     assert_abs_diff_eq!(best_c, 0.125);
     assert_abs_diff_eq!(acc, 0.8407407407407408);
     assert_eq!(best_p, -1f64);
