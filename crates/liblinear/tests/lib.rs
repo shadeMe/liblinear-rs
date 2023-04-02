@@ -15,7 +15,7 @@ fn create_default_training_data() -> TrainingInput {
 
 #[test]
 fn test_version() {
-    assert_eq!(liblinear::liblinear_version(), 244);
+    assert_eq!(liblinear::liblinear_version(), 246);
 }
 
 #[test]
