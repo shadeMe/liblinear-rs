@@ -43,7 +43,11 @@ let predicted_class = model
 println!("{}", predicted_class);
 ```
 
-Refer to the [API docs][docs.rs] for more information.
+Please refer to the [API docs][docs.rs] for more information.
+
+# Changelog
+
+Please refer to the detailed [changelog](CHANGELOG.md).
 
 [latest version]: https://img.shields.io/crates/v/liblinear.svg
 [crates.io]: https://crates.io/crates/liblinear
