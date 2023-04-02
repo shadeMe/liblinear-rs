@@ -37,7 +37,7 @@ impl FromStr for TrainingInstance {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         // assumes that the string is a valid line in the libSVM data format
         let mut last_feature_index = 0u32;
-        let splits: Vec<&str> = s.split(' ').collect();
+        let splits: Vec<&str> = s.trim().split(' ').collect();
         match splits.len() {
             0 => Err(TrainingInputError::ParseError("Empty line".to_owned())),
             1 => Err(TrainingInputError::ParseError(
@@ -65,7 +65,7 @@ impl FromStr for TrainingInstance {
                             let pair: Vec<&str> = token.split(':').collect();
                             if pair.len() != 2 {
                                 return Err(TrainingInputError::ParseError(format!(
-                                    "Couldn't feature pair '{}'",
+                                    "Couldn't parse feature pair '{}' - Each feature pair must be of the following format: <unsigned int idx>:<double value>",
                                     token
                                 )));
                             }
@@ -73,13 +73,13 @@ impl FromStr for TrainingInstance {
                             features.push((
                                 pair[0].parse::<u32>().map_err(|_| {
                                     TrainingInputError::ParseError(format!(
-                                        "Couldn't parse feature index '{}'",
+                                        "Couldn't parse feature index '{}' as u32",
                                         pair[0]
                                     ))
                                 })?,
                                 pair[1].parse::<f64>().map_err(|_| {
                                     TrainingInputError::ParseError(format!(
-                                        "Couldn't parse feature value '{}'",
+                                        "Couldn't parse feature value '{}' as f64",
                                         pair[1]
                                     ))
                                 })?,
@@ -88,11 +88,11 @@ impl FromStr for TrainingInstance {
                             let parsed_feature_index = features.last().unwrap().0;
                             if parsed_feature_index == 0 {
                                 return Err(TrainingInputError::DataError(
-                                    "Invalid feature index '0'".to_owned(),
+                                    "Invalid feature index '0' - Indices start from 1".to_owned(),
                                 ));
                             } else if parsed_feature_index < last_feature_index {
                                 return Err(TrainingInputError::DataError(
-                                    "Feature indices must be ascending".to_owned(),
+                                    "Feature indices must be monotonic".to_owned(),
                                 ));
                             }
 
@@ -302,5 +302,61 @@ impl PredictionInput {
             features,
             last_feature_index,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{errors::TrainingInputError, util::TrainingInstance};
+
+    #[test]
+    fn test_training_input_parsing() {
+        assert!(matches!(
+            "".parse::<TrainingInstance>(),
+            Err(TrainingInputError::ParseError { .. })
+        ));
+        assert!(matches!(
+            "         ".parse::<TrainingInstance>(),
+            Err(TrainingInputError::ParseError { .. })
+        ));
+        assert!(matches!(
+            "1 ".parse::<TrainingInstance>(),
+            Err(TrainingInputError::ParseError { .. })
+        ));
+        assert!(matches!(
+            "1 2".parse::<TrainingInstance>(),
+            Err(TrainingInputError::ParseError { .. })
+        ));
+        assert!(matches!(
+            "1 1:".parse::<TrainingInstance>(),
+            Err(TrainingInputError::ParseError { .. })
+        ));
+        assert!(matches!(
+            "1 1:2:3".parse::<TrainingInstance>(),
+            Err(TrainingInputError::ParseError { .. })
+        ));
+        assert!(matches!(
+            "1 -1:2".parse::<TrainingInstance>(),
+            Err(TrainingInputError::ParseError { .. })
+        ));
+        assert!(matches!(
+            "1 -1:aa".parse::<TrainingInstance>(),
+            Err(TrainingInputError::ParseError { .. })
+        ));
+        assert!(matches!(
+            "1 0:12.11".parse::<TrainingInstance>(),
+            Err(TrainingInputError::DataError { .. })
+        ));
+        assert!(matches!(
+            "1 1:1.11 20:2.22 10:-1".parse::<TrainingInstance>(),
+            Err(TrainingInputError::DataError { .. })
+        ));
+
+        let instance: TrainingInstance = "1 2:-10.21 3:10.21 5:11 99:20".parse().unwrap();
+        assert_eq!(instance.label, 1f64);
+        let (indices, values): (Vec<u32>, Vec<f64>) =
+            instance.features().clone().into_iter().unzip();
+        assert_eq!(&indices, &[2u32, 3u32, 5u32, 99u32]);
+        assert_eq!(&values, &[-10.21f64, 10.21f64, 11f64, 20f64]);
     }
 }
