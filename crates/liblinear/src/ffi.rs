@@ -1,4 +1,4 @@
-//! FFI bindings for liblinear.
+//! FFI bindings for LIBLINEAR.
 
 use std::os::raw::c_char;
 

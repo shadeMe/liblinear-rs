@@ -1,4 +1,4 @@
-//! Types and traits that wrap hyper parameters.
+//! Types and traits that wrap LIBLINEAR hyper parameters.
 
 use std::marker::PhantomData;
 
@@ -23,6 +23,8 @@ pub mod traits {
     /// [`SupportsInitialSolutions`](crate::solver::traits::SupportsInitialSolutions) trait.
     pub trait SetInitialSolutions {
         /// Set the initial solution specification.
+        ///
+        /// Default: `None`
         fn initial_solutions(&mut self, init_solutions: Vec<f64>) -> &mut Self;
     }
 
@@ -51,7 +53,7 @@ pub mod traits {
     pub trait SetRegressionLossSensitivity {
         /// Set the tolerance margin/loss sensitivity of support vector regression (parameter `p`).
         ///
-        /// Default: `0.1
+        /// Default: `0.1`
         fn regression_loss_sensitivity(&mut self, p: f64) -> &mut Self;
     }
 }

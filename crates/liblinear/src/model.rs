@@ -1,4 +1,4 @@
-//! Types and traits that wrap models.
+//! Types and traits that wrap LIBLINEAR models.
 
 use std::{ffi::CStr, marker::PhantomData};
 
@@ -130,7 +130,6 @@ pub mod traits {
     pub trait NonSingleClassModel {
         /// Returns the bias term corresponding to the class with the given index.
         ///
-        /// For classification models, if label index is not in a valid range, an !!!ERROR value will be returned.
         /// For regression models, the label index is ignored.
         fn label_bias(&self, label_index: u32) -> Result<f64, ModelError>;
     }
