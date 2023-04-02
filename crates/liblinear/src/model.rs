@@ -2,6 +2,7 @@
 
 use std::{ffi::CStr, marker::PhantomData};
 
+use self::traits::ModelBase;
 use crate::{
     errors::{ModelError, PredictionInputError},
     ffi::{self, FeatureNode},
@@ -11,12 +12,12 @@ use crate::{
             IsLogisticRegressionSolver, IsNonSingleClassSolver, IsSingleClassSolver,
             IsTrainableSolver, Solver, SupportsParameterSearch,
         },
-        GenericSolver, SolverOrdinal, L2R_L2LOSS_SVC_DUAL, L2R_LR,
+        GenericSolver, SolverOrdinal, L1R_L2LOSS_SVC, L1R_LR, L2R_L1LOSS_SVC_DUAL,
+        L2R_L1LOSS_SVR_DUAL, L2R_L2LOSS_SVC, L2R_L2LOSS_SVC_DUAL, L2R_L2LOSS_SVR,
+        L2R_L2LOSS_SVR_DUAL, L2R_LR, L2R_LR_DUAL, MCSVM_CS, ONECLASS_SVM,
     },
     util::{PredictionInput, TrainingInput},
 };
-
-use self::traits::ModelBase;
 
 /// Traits implemented by [`Model`].
 pub mod traits {
@@ -39,7 +40,7 @@ pub mod traits {
         ///
         /// * A list of decision values. If `k` is the number of classes, each element includes results
         /// of predicting k binary-class SVMs. If `k == 2` and solver is not `MCSVM_CS`, only the first
-        /// decision value is returned.
+        /// decision value is valid.
         ///
         ///   The values correspond to the classes returned by the `labels` method.
         ///
@@ -68,7 +69,7 @@ pub mod traits {
 
         /// Returns the number of classes of the model.
         ///
-        /// For regression models, `2` is returned.
+        /// For regression models and one-class SVMs, `2` is returned.
         fn num_classes(&self) -> u32;
 
         /// Returns the number of features of the input data with which the model was trained.
@@ -402,8 +403,10 @@ where
     }
 
     fn feature_coefficient(&self, feature_index: u32, label_index: u32) -> Result<f64, ModelError> {
-        let corrected_feature_idx = feature_index - 1;
-        if feature_index > self.num_features() || corrected_feature_idx > self.num_features() {
+        if feature_index == 0
+            || feature_index > self.num_features()
+            || feature_index - 1 > self.num_features()
+        {
             return Err(ModelError::IllegalArgument(format!(
                 "expected 1 <= feature index <= {}, but got '{}'",
                 self.num_features(),
@@ -676,64 +679,50 @@ pub mod serde {
     }
 }
 
-impl TryFrom<Model<GenericSolver>> for Model<L2R_LR> {
-    type Error = ModelError;
+macro_rules! impl_tryfrom_for_solver {
+    ($solver: ident) => {
+        impl TryFrom<Model<GenericSolver>> for Model<$solver> {
+            type Error = ModelError;
 
-    fn try_from(mut value: Model<GenericSolver>) -> Result<Self, Self::Error> {
-        {
-            let model = &value as &dyn ModelBase;
-            if model.solver() != L2R_LR::ordinal() {
-                return Err(ModelError::InvalidConversion(format!(
-                    "conversion only possible into a model with '{:?}' solver",
-                    model.solver()
-                )));
+            fn try_from(mut value: Model<GenericSolver>) -> Result<Self, Self::Error> {
+                {
+                    let model = &value as &dyn ModelBase;
+                    if model.solver() != $solver::ordinal() {
+                        return Err(ModelError::InvalidConversion(format!(
+                            "conversion only possible into a model with '{:?}' solver",
+                            model.solver()
+                        )));
+                    }
+                }
+
+                assert!(
+                    value.training_storage.is_none(),
+                    "model with generic solver has backing store"
+                );
+
+                let c_obj = value.c_obj;
+                value.c_obj = std::ptr::null_mut();
+
+                Ok(Model {
+                    _solver: std::marker::PhantomData,
+                    training_storage: None,
+                    learned_labels: value.learned_labels.clone(),
+                    c_obj,
+                })
             }
         }
-
-        assert!(
-            value.training_storage.is_none(),
-            "model with generic solver has backing store"
-        );
-
-        let c_obj = value.c_obj;
-        value.c_obj = std::ptr::null_mut();
-
-        Ok(Model {
-            _solver: PhantomData,
-            training_storage: None,
-            learned_labels: value.learned_labels.clone(),
-            c_obj,
-        })
-    }
+    };
 }
 
-impl TryFrom<Model<GenericSolver>> for Model<L2R_L2LOSS_SVC_DUAL> {
-    type Error = ModelError;
-
-    fn try_from(mut value: Model<GenericSolver>) -> Result<Self, Self::Error> {
-        {
-            let model = &value as &dyn ModelBase;
-            if model.solver() != L2R_L2LOSS_SVC_DUAL::ordinal() {
-                return Err(ModelError::InvalidConversion(format!(
-                    "conversion only possible into a model with '{:?}' solver",
-                    model.solver()
-                )));
-            }
-        }
-
-        assert!(
-            value.training_storage.is_none(),
-            "model with generic solver has backing store"
-        );
-
-        let c_obj = value.c_obj;
-        value.c_obj = std::ptr::null_mut();
-
-        Ok(Model {
-            _solver: PhantomData,
-            training_storage: None,
-            learned_labels: value.learned_labels.clone(),
-            c_obj,
-        })
-    }
-}
+impl_tryfrom_for_solver!(L2R_LR);
+impl_tryfrom_for_solver!(L2R_L2LOSS_SVC_DUAL);
+impl_tryfrom_for_solver!(L2R_L2LOSS_SVC);
+impl_tryfrom_for_solver!(L2R_L1LOSS_SVC_DUAL);
+impl_tryfrom_for_solver!(MCSVM_CS);
+impl_tryfrom_for_solver!(L1R_L2LOSS_SVC);
+impl_tryfrom_for_solver!(L1R_LR);
+impl_tryfrom_for_solver!(L2R_LR_DUAL);
+impl_tryfrom_for_solver!(L2R_L2LOSS_SVR);
+impl_tryfrom_for_solver!(L2R_L2LOSS_SVR_DUAL);
+impl_tryfrom_for_solver!(L2R_L1LOSS_SVR_DUAL);
+impl_tryfrom_for_solver!(ONECLASS_SVM);
