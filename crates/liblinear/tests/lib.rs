@@ -1,5 +1,8 @@
-use approx::abs_diff_eq;
+use std::path::PathBuf;
+
+use approx::assert_abs_diff_eq;
 use liblinear::{
+    errors::ModelError,
     model::Model,
     model::{serde, traits::*},
     parameter::Parameters,
@@ -9,7 +12,9 @@ use liblinear::{
 use parsnip::categorical_accuracy;
 
 fn create_default_training_data() -> TrainingInput {
-    TrainingInput::from_libsvm_file("tests/data/heart_scale")
+    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    path.push("tests/data/heart_scale");
+    TrainingInput::from_libsvm_file(path.into_os_string().to_str().unwrap())
         .expect("couldn't read training data from disk")
 }
 
@@ -33,10 +38,28 @@ fn test_training_input_libsvm_data() {
     }
 
     let mut params = Parameters::<L1R_LR>::default();
-    params.stopping_tolerance(0.11f64).bias(12f64);
+    params.bias(10.2f64);
     let model = Model::train(&libsvm_data, &params).expect("couldn't train model");
 
     assert_eq!(model.num_classes(), 2);
+    assert_eq!(model.num_features(), 13);
+    assert!(matches!(
+        model.feature_coefficient(0, 0),
+        Err(ModelError::IllegalArgument { .. })
+    ));
+    assert!(matches!(
+        model.feature_coefficient(1, 3),
+        Err(ModelError::IllegalArgument { .. })
+    ));
+    assert!(matches!(
+        model.feature_coefficient(14, 0),
+        Err(ModelError::IllegalArgument { .. })
+    ));
+    let coeff_3 = model.feature_coefficient(3, 0).unwrap();
+    let coeff_13 = model.feature_coefficient(13, 0).unwrap();
+    assert_abs_diff_eq!(coeff_3, 0.94297139496922078);
+    assert_abs_diff_eq!(coeff_13, 0.6897863117952574);
+
     let class = model
         .predict(
             &PredictionInput::from_dense_features(vec![
@@ -62,8 +85,7 @@ fn test_model_sparse_data() {
     params
         .bias(0f64)
         .stopping_tolerance(0.1f64)
-        .constraints_violation_cost(0.1f64)
-        .regression_loss_sensitivity(1f64);
+        .constraints_violation_cost(0.1f64);
 
     let model = Model::train(
         &TrainingInput::from_sparse_features(y, x).expect("couldn't generate training data"),
@@ -112,7 +134,7 @@ fn test_model_dense_data() {
 #[test]
 fn test_model_save_load() {
     let libsvm_data = create_default_training_data();
-    let mut params = Parameters::<L2R_LR>::default();
+    let mut params = Parameters::<L1R_LR>::default();
     params.bias(10.2);
     let model = Model::train(&libsvm_data, &params).expect("couldn't train model");
 
@@ -128,7 +150,7 @@ fn test_model_save_load() {
     assert_eq!(model.bias(), 10.2);
     assert_eq!(model.labels(), &model_labels);
 
-    let _: Model<L2R_LR> = model
+    let _: Model<L1R_LR> = model
         .try_into()
         .expect("couldn't convert model to correct type");
 
@@ -175,7 +197,7 @@ fn test_cross_validator() {
         .collect::<Vec<i32>>();
 
     // RHS was taken from the output of liblinear's bundled trainer program
-    let _ = abs_diff_eq!(
+    assert_abs_diff_eq!(
         categorical_accuracy(&predicted, &ground_truth).unwrap(),
         0.8148148
     );
@@ -185,11 +207,14 @@ fn test_cross_validator() {
             &libsvm_data,
             &params,
             4,
-            0.0,
-            0.0,
+            -1.0,
+            -1.0,
         )
         .expect("couldn't perform parameter search");
-    let _ = abs_diff_eq!(best_c, 0.00390625);
-    let _ = abs_diff_eq!(acc, 0.8407407);
+    // dbg!(best_c);
+    // dbg!(acc);
+    // dbg!(best_p);
+    assert_abs_diff_eq!(best_c, 0.125);
+    assert_abs_diff_eq!(acc, 0.8407407407407408);
     assert_eq!(best_p, -1f64);
 }
