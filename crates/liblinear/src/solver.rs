@@ -17,7 +17,8 @@
 
 use liblinear_macros::{
     CanDisableBiasRegularization, IsLogisticRegressionSolver, IsNonSingleClassSolver,
-    IsSingleClassSolver, IsTrainableSolver, SupportsInitialSolutions, SupportsParameterSearch,
+    IsSingleClassSolver, IsSupportVectorRegressionSolver, IsTrainableSolver,
+    SupportsInitialSolutions, SupportsParameterSearch,
 };
 
 /// Traits implemented by solvers.
@@ -31,6 +32,9 @@ pub mod traits {
 
     /// Marker trait for probablistic/logistic regression solvers.
     pub trait IsLogisticRegressionSolver: Solver {}
+
+    /// Marker trait for support vector regression solvers.
+    pub trait IsSupportVectorRegressionSolver: Solver {}
 
     /// Marker trait for single-class solvers.
     pub trait IsSingleClassSolver: Solver {}
@@ -190,6 +194,7 @@ impl traits::Solver for L2R_LR_DUAL {
     Copy,
     Clone,
     Debug,
+    IsSupportVectorRegressionSolver,
     IsNonSingleClassSolver,
     IsTrainableSolver,
     CanDisableBiasRegularization,
@@ -205,7 +210,9 @@ impl traits::Solver for L2R_L2LOSS_SVR {
 
 /// L2-regularized L2-loss support vector regression (dual).
 #[allow(non_camel_case_types)]
-#[derive(Copy, Clone, Debug, IsNonSingleClassSolver, IsTrainableSolver)]
+#[derive(
+    Copy, Clone, Debug, IsSupportVectorRegressionSolver, IsNonSingleClassSolver, IsTrainableSolver,
+)]
 pub struct L2R_L2LOSS_SVR_DUAL;
 impl traits::Solver for L2R_L2LOSS_SVR_DUAL {
     fn ordinal() -> SolverOrdinal {
@@ -215,7 +222,9 @@ impl traits::Solver for L2R_L2LOSS_SVR_DUAL {
 
 /// L2-regularized L1-loss support vector regression (dual).
 #[allow(non_camel_case_types)]
-#[derive(Copy, Clone, Debug, IsNonSingleClassSolver, IsTrainableSolver)]
+#[derive(
+    Copy, Clone, Debug, IsSupportVectorRegressionSolver, IsNonSingleClassSolver, IsTrainableSolver,
+)]
 pub struct L2R_L1LOSS_SVR_DUAL;
 impl traits::Solver for L2R_L1LOSS_SVR_DUAL {
     fn ordinal() -> SolverOrdinal {

@@ -6,14 +6,16 @@ use crate::{
     errors::ModelError,
     solver::{
         traits::{
-            CanDisableBiasRegularization, IsSingleClassSolver, IsTrainableSolver, Solver,
-            SupportsInitialSolutions,
+            CanDisableBiasRegularization, IsSingleClassSolver, IsSupportVectorRegressionSolver,
+            IsTrainableSolver, Solver, SupportsInitialSolutions,
         },
         SolverOrdinal,
     },
 };
 
-use self::traits::{SetBiasRegularization, SetInitialSolutions, SetOutlierRatio};
+use self::traits::{
+    SetBiasRegularization, SetInitialSolutions, SetOutlierRatio, SetRegressionLossSensitivity,
+};
 
 /// Traits implemented by [`Parameters`].
 pub mod traits {
@@ -42,6 +44,15 @@ pub mod traits {
         ///
         /// Default: `0.5`
         fn outlier_ratio(&mut self, nu: f64) -> &mut Self;
+    }
+
+    /// Implemented for parameters with solvers that implement the
+    /// [`IsSupportVectorRegressionSolver`](crate::solver::traits::IsSupportVectorRegressionSolver) trait.
+    pub trait SetRegressionLossSensitivity {
+        /// Set the tolerance margin/loss sensitivity of support vector regression (parameter `p`).
+        ///
+        /// Default: `0.1
+        fn regression_loss_sensitivity(&mut self, p: f64) -> &mut Self;
     }
 }
 
@@ -101,16 +112,6 @@ where
         self
     }
 
-    /// Set the tolerance margin/loss sensitivity of support vector regression (parameter `p`).
-    ///
-    /// Not used for classification problems.
-    ///
-    /// Default: `0.1
-    pub fn regression_loss_sensitivity(&mut self, p: f64) -> &mut Self {
-        self.p = p;
-        self
-    }
-
     /// Set weights to adjust the cost of constraints violation for specific classes. Each element
     /// is a tuple where the first value is the label and the second its corresponding weight penalty.
     ///
@@ -143,9 +144,9 @@ where
             )));
         }
 
-        if self.p < 0f64 && <SolverT as Solver>::ordinal() == SolverOrdinal::L2R_L2LOSS_SVR {
+        if self.p < 0f64 {
             return Err(ModelError::InvalidParameters(format!(
-                "regression loss sensitivity must be >= 0 for the L2R_L2LOSS_SVR solver, but got '{}'",
+                "regression loss sensitivity must be >= 0, but got '{}'",
                 self.p
             )));
         }
@@ -157,7 +158,7 @@ where
             )));
         }
 
-        if !self.regularize_bias {
+        if !self.regularize_bias && self.bias != 1f64 {
             return Err(ModelError::InvalidParameters(format!(
                 "bias term must be `1.0` when regularization is disabled, but got '{}'",
                 self.bias
@@ -198,5 +199,69 @@ where
     fn outlier_ratio(&mut self, nu: f64) -> &mut Self {
         self.nu = nu;
         self
+    }
+}
+
+impl<SolverT> SetRegressionLossSensitivity for Parameters<SolverT>
+where
+    SolverT: IsTrainableSolver + IsSupportVectorRegressionSolver,
+{
+    fn regression_loss_sensitivity(&mut self, p: f64) -> &mut Self {
+        self.p = p;
+        self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{errors::ModelError, solver};
+
+    use super::traits::*;
+    use super::Parameters;
+
+    #[test]
+    fn test_parameter_runtime_validation() {
+        let mut params = Parameters::<solver::L2R_LR>::default();
+        params.stopping_tolerance(-1f64);
+        assert!(matches!(
+            params.validate(),
+            Err(ModelError::InvalidParameters { .. })
+        ));
+
+        let mut params = Parameters::<solver::L1R_LR>::default();
+        params.constraints_violation_cost(0f64);
+        assert!(matches!(
+            params.validate(),
+            Err(ModelError::InvalidParameters { .. })
+        ));
+
+        let mut params = Parameters::<solver::L2R_L2LOSS_SVR>::default();
+        params.regression_loss_sensitivity(-1f64);
+        assert!(matches!(
+            params.validate(),
+            Err(ModelError::InvalidParameters { .. })
+        ));
+
+        let mut params = Parameters::<solver::ONECLASS_SVM>::default();
+        params.bias(10f64).outlier_ratio(1f64);
+        assert!(matches!(
+            params.validate(),
+            Err(ModelError::InvalidParameters { .. })
+        ));
+
+        let mut params = Parameters::<solver::L1R_L2LOSS_SVC>::default();
+        params.bias_regularization(false).bias(10f64);
+        assert!(matches!(
+            params.validate(),
+            Err(ModelError::InvalidParameters { .. })
+        ));
+
+        let mut params = Parameters::<solver::L2R_L2LOSS_SVR>::default();
+        params
+            .cost_penalty(Vec::new())
+            .initial_solutions(Vec::new());
+
+        let mut params = Parameters::<solver::L2R_L2LOSS_SVR>::default();
+        params.cost_penalty(Vec::new());
     }
 }
