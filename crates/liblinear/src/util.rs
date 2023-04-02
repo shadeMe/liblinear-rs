@@ -1,39 +1,15 @@
-//! Utility structs and functions for reading/generating training
-//! and prediction data.
+//! Utility structs and functions for reading/generating training and prediction data.
 
 use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::str::FromStr;
 
-/// Errors related to input/training data.
-#[derive(Debug, Fail)]
-pub enum TrainingInputError {
-    /// The LIBSVM data file was not found/couldn't be read.
-    #[fail(display = "io error: {}", e)]
-    IoError {
-        #[doc(hidden)]
-        e: String,
-    },
-    /// The LIBSVM data file has invalid/incomplete entries that do not conform to the expected format.
-    #[fail(display = "parse error: {}", e)]
-    ParseError {
-        #[doc(hidden)]
-        e: String,
-    },
-    /// The training data is invalid/incomplete.
-    ///
-    /// This can occur if the input features are missing, or if there is mismatch between the
-    /// target values and the source features, or if the data is incorrect.
-    #[fail(display = "data error: {}", e)]
-    DataError {
-        #[doc(hidden)]
-        e: String,
-    },
-}
+use crate::errors::PredictionInputError;
+use crate::errors::TrainingInputError;
 
 /// A tuple of a (sparse) vector of features and their corresponding gold-standard label/target value.
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct TrainingInstance {
     features: Vec<(u32, f64)>,
     label: f64,
@@ -45,6 +21,7 @@ impl TrainingInstance {
     pub fn features(&self) -> &Vec<(u32, f64)> {
         &self.features
     }
+
     /// The target value.
     ///
     /// Target values are either integers (in classification) or real numbers (in regression).
@@ -60,18 +37,12 @@ impl FromStr for TrainingInstance {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         // assumes that the string is a valid line in the libSVM data format
         let mut last_feature_index = 0u32;
-        let splits: Vec<&str> = s.split(" ").collect();
+        let splits: Vec<&str> = s.trim().split(' ').collect();
         match splits.len() {
-            0 => {
-                return Err(TrainingInputError::ParseError {
-                    e: "Empty line".to_string(),
-                });
-            }
-            1 => {
-                return Err(TrainingInputError::ParseError {
-                    e: "No features found".to_string(),
-                });
-            }
+            0 => Err(TrainingInputError::ParseError("Empty line".to_owned())),
+            1 => Err(TrainingInputError::ParseError(
+                "No features found".to_owned(),
+            )),
             _ => {
                 let mut label = 0f64;
                 let mut features: Vec<(u32, f64)> = Vec::default();
@@ -84,44 +55,45 @@ impl FromStr for TrainingInstance {
                     match idx {
                         0 => {
                             label = token.parse::<f64>().map_err(|_| {
-                                TrainingInputError::ParseError {
-                                    e: format!("Couldn't parse output label '{}'", token)
-                                        .to_string(),
-                                }
+                                TrainingInputError::ParseError(format!(
+                                    "Couldn't parse output label '{}'",
+                                    token
+                                ))
                             })?
                         }
                         _ => {
-                            let pair: Vec<&str> = token.split(":").collect();
+                            let pair: Vec<&str> = token.split(':').collect();
                             if pair.len() != 2 {
-                                return Err(TrainingInputError::ParseError {
-                                    e: format!("Couldn't feature pair '{}'", token).to_string(),
-                                });
+                                return Err(TrainingInputError::ParseError(format!(
+                                    "Couldn't parse feature pair '{}' - Each feature pair must be of the following format: <unsigned int idx>:<double value>",
+                                    token
+                                )));
                             }
 
                             features.push((
                                 pair[0].parse::<u32>().map_err(|_| {
-                                    TrainingInputError::ParseError {
-                                        e: format!("Couldn't parse feature index '{}'", pair[0])
-                                            .to_string(),
-                                    }
+                                    TrainingInputError::ParseError(format!(
+                                        "Couldn't parse feature index '{}' as u32",
+                                        pair[0]
+                                    ))
                                 })?,
                                 pair[1].parse::<f64>().map_err(|_| {
-                                    TrainingInputError::ParseError {
-                                        e: format!("Couldn't parse feature value '{}'", pair[1])
-                                            .to_string(),
-                                    }
+                                    TrainingInputError::ParseError(format!(
+                                        "Couldn't parse feature value '{}' as f64",
+                                        pair[1]
+                                    ))
                                 })?,
                             ));
 
                             let parsed_feature_index = features.last().unwrap().0;
                             if parsed_feature_index == 0 {
-                                return Err(TrainingInputError::DataError {
-                                    e: "Invalid feature index '0'".to_string(),
-                                });
+                                return Err(TrainingInputError::DataError(
+                                    "Invalid feature index '0' - Indices start from 1".to_owned(),
+                                ));
                             } else if parsed_feature_index < last_feature_index {
-                                return Err(TrainingInputError::DataError {
-                                    e: "Feature indices must be ascending".to_string(),
-                                });
+                                return Err(TrainingInputError::DataError(
+                                    "Feature indices must be monotonic".to_owned(),
+                                ));
                             }
 
                             last_feature_index = parsed_feature_index;
@@ -139,56 +111,56 @@ impl FromStr for TrainingInstance {
     }
 }
 
-/// Input data for [LibLinearModel](trait.LibLinearModel.html) and [LibLinearCrossValidator](trait.LibLinearCrossValidator.html).
-#[derive(Default, Clone)]
+/// Training data for [`Model`](crate::model::Model).
+#[derive(Default, Clone, Debug)]
 pub struct TrainingInput {
     instances: Vec<TrainingInstance>,
     last_feature_index: u32,
 }
 
 impl TrainingInput {
-    #[doc(hidden)]
-    pub fn last_feature_index(&self) -> u32 {
-        self.last_feature_index
+    /// Constituent training instances.
+    pub fn instances(&self) -> &Vec<TrainingInstance> {
+        &self.instances
     }
-    #[doc(hidden)]
-    pub fn yield_data(self) -> Vec<TrainingInstance> {
-        self.instances
-    }
+
     /// Number of training instances.
-    pub fn len_data(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.instances.len()
     }
-    /// Dimensionality of the feature vector.
-    pub fn len_features(&self) -> usize {
-        self.last_feature_index as usize
+
+    /// Returns `true` if there are no training instances.
+    pub fn is_empty(&self) -> bool {
+        self.instances.is_empty()
     }
+
+    /// Dimensionality of the feature vector.
+    pub fn dim(&self) -> u32 {
+        self.last_feature_index
+    }
+
     /// Returns a reference to the training instance at the given index.
     pub fn get(&self, index: usize) -> Option<&TrainingInstance> {
         self.instances.get(index)
     }
+
     /// Create a new instance from a LIBSVM training data file.
     ///
     /// Each line in the data file represents a training instance and has the following format:
     ///
     /// `<target_value> <feature_index>:<feature_value> <feature_index>:<feature_value>...`
     ///
-    /// Feature indices start from 1 and increase monotonically. However, they do not need to be continuous.
+    /// Feature indices start from `1` and increase monotonically. However, they do not need to be continuous.
     pub fn from_libsvm_file(path: &str) -> Result<TrainingInput, TrainingInputError> {
         let mut out = TrainingInput::default();
-	    let reader =
-		    BufReader::new(
-			    File::open(path).map_err(|io_err| TrainingInputError::IoError {
-				    e: io_err.to_string(),
-			    })?,
-		    );
+        let reader = BufReader::new(
+            File::open(path).map_err(|io_err| TrainingInputError::IoError(io_err.to_string()))?,
+        );
 
         for line in reader.lines() {
-	        let new_training_instance = TrainingInstance::from_str(
-	            line.map_err(|io_err| TrainingInputError::IoError {
-                    e: io_err.to_string(),
-                })?
-		            .as_str(),
+            let new_training_instance = TrainingInstance::from_str(
+                line.map_err(|io_err| TrainingInputError::IoError(io_err.to_string()))?
+                    .as_str(),
             )?;
 
             out.last_feature_index = new_training_instance.last_feature_index;
@@ -204,13 +176,13 @@ impl TrainingInput {
         features: Vec<Vec<f64>>,
     ) -> Result<TrainingInput, TrainingInputError> {
         if labels.len() != features.len() {
-            return Err(TrainingInputError::DataError {
-                e: "Mismatch between number of training instances and output labels".to_string(),
-            });
-        } else if labels.len() == 0 || features.len() == 0 {
-            return Err(TrainingInputError::DataError {
-                e: "No input/output data".to_string(),
-            });
+            return Err(TrainingInputError::DataError(
+                "Mismatch between number of training instances and output labels".to_owned(),
+            ));
+        } else if labels.is_empty() || features.is_empty() {
+            return Err(TrainingInputError::DataError(
+                "No input/output data".to_owned(),
+            ));
         }
 
         let last_feature_index = features.len() as u32;
@@ -244,13 +216,13 @@ impl TrainingInput {
         features: Vec<Vec<(u32, f64)>>,
     ) -> Result<TrainingInput, TrainingInputError> {
         if labels.len() != features.len() {
-            return Err(TrainingInputError::DataError {
-                e: "Mismatch between number of training instances and output labels".to_string(),
-            });
-        } else if labels.len() == 0 || features.len() == 0 {
-            return Err(TrainingInputError::DataError {
-                e: "No input/output data".to_string(),
-            });
+            return Err(TrainingInputError::DataError(
+                "Mismatch between number of training instances and output labels".to_owned(),
+            ));
+        } else if labels.is_empty() || features.is_empty() {
+            return Err(TrainingInputError::DataError(
+                "No input/output data".to_owned(),
+            ));
         }
 
         let last_feature_index = features.iter().fold(0u32, |acc, feats| {
@@ -274,18 +246,7 @@ impl TrainingInput {
     }
 }
 
-/// Errors related to test/prediction data.
-#[derive(Debug, Fail)]
-pub enum PredictionInputError {
-    /// The prediction data is invalid/incomplete/missing.
-    #[fail(display = "data error: {}", e)]
-    DataError {
-        #[doc(hidden)]
-        e: String,
-    },
-}
-
-/// Test data for [LibLinearModel](trait.LibLinearModel.html).
+/// Prediction data for [`Model`](crate::model::Model).
 #[derive(Default, Clone)]
 pub struct PredictionInput {
     features: Vec<(u32, f64)>,
@@ -293,16 +254,13 @@ pub struct PredictionInput {
 }
 
 impl PredictionInput {
-    /// A list of tuples that encode a feature index and its corresponding feature value.
+    /// The features as a list of index and value tuples.
     pub fn features(&self) -> &Vec<(u32, f64)> {
         &self.features
     }
-    #[doc(hidden)]
-    pub fn yield_data(self) -> Vec<(u32, f64)> {
-        self.features
-    }
-    #[doc(hidden)]
-    pub fn last_feature_index(&self) -> u32 {
+
+    /// Dimensionality of the feature vector.
+    pub fn dim(&self) -> u32 {
         self.last_feature_index
     }
 
@@ -310,10 +268,8 @@ impl PredictionInput {
     pub fn from_dense_features(
         features: Vec<f64>,
     ) -> Result<PredictionInput, PredictionInputError> {
-        if features.len() == 0 {
-            return Err(PredictionInputError::DataError {
-                e: "No input data".to_string(),
-            });
+        if features.is_empty() {
+            return Err(PredictionInputError::DataError("No input data".to_owned()));
         }
 
         let last_feature_index = features.len() as u32;
@@ -334,10 +290,8 @@ impl PredictionInput {
     pub fn from_sparse_features(
         features: Vec<(u32, f64)>,
     ) -> Result<PredictionInput, PredictionInputError> {
-        if features.len() == 0 {
-            return Err(PredictionInputError::DataError {
-                e: "No input data".to_string(),
-            });
+        if features.is_empty() {
+            return Err(PredictionInputError::DataError("No input data".to_owned()));
         }
 
         let last_feature_index = features
@@ -348,5 +302,61 @@ impl PredictionInput {
             features,
             last_feature_index,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{errors::TrainingInputError, util::TrainingInstance};
+
+    #[test]
+    fn test_training_input_parsing() {
+        assert!(matches!(
+            "".parse::<TrainingInstance>(),
+            Err(TrainingInputError::ParseError { .. })
+        ));
+        assert!(matches!(
+            "         ".parse::<TrainingInstance>(),
+            Err(TrainingInputError::ParseError { .. })
+        ));
+        assert!(matches!(
+            "1 ".parse::<TrainingInstance>(),
+            Err(TrainingInputError::ParseError { .. })
+        ));
+        assert!(matches!(
+            "1 2".parse::<TrainingInstance>(),
+            Err(TrainingInputError::ParseError { .. })
+        ));
+        assert!(matches!(
+            "1 1:".parse::<TrainingInstance>(),
+            Err(TrainingInputError::ParseError { .. })
+        ));
+        assert!(matches!(
+            "1 1:2:3".parse::<TrainingInstance>(),
+            Err(TrainingInputError::ParseError { .. })
+        ));
+        assert!(matches!(
+            "1 -1:2".parse::<TrainingInstance>(),
+            Err(TrainingInputError::ParseError { .. })
+        ));
+        assert!(matches!(
+            "1 -1:aa".parse::<TrainingInstance>(),
+            Err(TrainingInputError::ParseError { .. })
+        ));
+        assert!(matches!(
+            "1 0:12.11".parse::<TrainingInstance>(),
+            Err(TrainingInputError::DataError { .. })
+        ));
+        assert!(matches!(
+            "1 1:1.11 20:2.22 10:-1".parse::<TrainingInstance>(),
+            Err(TrainingInputError::DataError { .. })
+        ));
+
+        let instance: TrainingInstance = "1 2:-10.21 3:10.21 5:11 99:20".parse().unwrap();
+        assert_eq!(instance.label, 1f64);
+        let (indices, values): (Vec<u32>, Vec<f64>) =
+            instance.features().clone().into_iter().unzip();
+        assert_eq!(&indices, &[2u32, 3u32, 5u32, 99u32]);
+        assert_eq!(&values, &[-10.21f64, 10.21f64, 11f64, 20f64]);
     }
 }

@@ -1,0 +1,26 @@
+[package]
+name = "liblinear"
+version = "2.0.0"
+authors = ["Madeesh Kannan"]
+edition = "2021"
+build = "build.rs"
+links = "liblinear.a"
+
+readme = "README.md"
+description = "Rust bindings for the liblinear C++ library"
+repository = "https://github.com/shadeMe/liblinear-rs"
+keywords = ["machine-learning", "statistics", "svm", "linear-model"]
+categories = ["api-bindings", "science", "simulation"]
+license = "MIT"
+
+[dependencies]
+thiserror = "1.0"
+parsnip = "0.3"
+approx = "0.5"
+num = "0.4"
+num-traits = "0.2"
+num-derive = "0.3"
+liblinear-macros = { path = "../liblinear-macros" }
+
+[build-dependencies]
+cc = "1.0"
